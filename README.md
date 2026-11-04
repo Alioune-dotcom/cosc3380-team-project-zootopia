@@ -3,7 +3,7 @@
 COSC 3380 Database Systems team web app
 
 ## Live app
-https://zoodb-cdg9cbfrd5dafvgd.spaincentral-01.azurewebsites.net
+https://zootopia-frontend-dvcmbzc2dhcgc5ht.westcentralus-01.azurewebsites.net
 
 ## Logins (password for all: `pass123`)
 
