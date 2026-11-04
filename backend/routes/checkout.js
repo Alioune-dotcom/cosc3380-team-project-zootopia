@@ -31,7 +31,6 @@ function readBody(req) {
   });
 }
 
-// insert product lines — stock trigger runs on each INSERT
 async function insertProducts(connection, transactionId, productList) {
   for (const item of productList) {
     const productId = item.productId;
@@ -62,25 +61,92 @@ async function insertProducts(connection, transactionId, productList) {
   }
 }
 
+async function insertTickets(connection, transactionId, tickets) {
+  const inserted = [];
+
+  for (const line of tickets) {
+    const type = line.type;
+    const quantity = parseInt(line.quantity, 10);
+
+    if (!type || !quantity || quantity <= 0) {
+      const err = new Error("Each ticket needs type and quantity > 0");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const unitPrice = TICKET_PRICES[type];
+    if (unitPrice == null) {
+      const err = new Error("Ticket type must be Adult, Child, or Senior");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const [result] = await connection.query(
+      `INSERT INTO ticket (TransactionID, Type, Quantity, UnitPrice)
+       VALUES (?, ?, ?, ?)`,
+      [transactionId, type, quantity, unitPrice]
+    );
+
+    inserted.push({
+      ticketId: result.insertId,
+      type,
+      quantity,
+      unitPrice
+    });
+  }
+
+  return inserted;
+}
+
+async function insertVisitedEnclosures(connection, transactionId, enclosureIds) {
+  const unique = [...new Set(enclosureIds.map((id) => parseInt(id, 10)).filter(Boolean))];
+
+  for (const enclosureId of unique) {
+    const [rows] = await connection.query(
+      "SELECT EnclosureID FROM enclosure WHERE EnclosureID = ? AND IsDeleted = 0",
+      [enclosureId]
+    );
+    if (rows.length === 0) {
+      const err = new Error("Enclosure not found: " + enclosureId);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    await connection.query(
+      `INSERT INTO transaction_enclosure (TransactionID, EnclosureID)
+       VALUES (?, ?)`,
+      [transactionId, enclosureId]
+    );
+  }
+}
+
 async function handleCheckout(req, res, pathname) {
-  // POST /api/checkout — ticket required, products optional (one transaction)
+  // POST /api/checkout — tickets required, products + visits optional
   if (req.method === "POST" && pathname === "/api/checkout") {
     let connection;
 
     try {
       const body = await readBody(req);
-      const { customerId, paymentType, ticketType } = body;
+      const { customerId, paymentType } = body;
       const productList = Array.isArray(body.products) ? body.products : [];
+      const enclosureIds = Array.isArray(body.enclosureIds) ? body.enclosureIds : [];
 
-      if (!customerId || !paymentType || !ticketType) {
+      // support multi-ticket lines, or legacy single ticketType
+      let tickets = Array.isArray(body.tickets) ? body.tickets : [];
+      if (tickets.length === 0 && body.ticketType) {
+        tickets = [{ type: body.ticketType, quantity: body.ticketQuantity || 1 }];
+      }
+
+      if (!customerId || !paymentType) {
         return sendJson(res, 400, { error: "Missing required fields" });
       }
 
-      const ticketPrice = TICKET_PRICES[ticketType];
-      if (ticketPrice == null) {
-        return sendJson(res, 400, {
-          error: "Ticket type must be Adult, Child, or Senior"
-        });
+      if (paymentType !== "Cash" && paymentType !== "Card") {
+        return sendJson(res, 400, { error: "PaymentType must be Cash or Card" });
+      }
+
+      if (tickets.length === 0) {
+        return sendJson(res, 400, { error: "At least one ticket is required" });
       }
 
       connection = await pool.getConnection();
@@ -103,15 +169,14 @@ async function handleCheckout(req, res, pathname) {
       );
       const transactionId = txResult.insertId;
 
-      const [ticketResult] = await connection.query(
-        `INSERT INTO ticket (TransactionID, Type, UnitPrice)
-         VALUES (?, ?, ?)`,
-        [transactionId, ticketType, ticketPrice]
-      );
+      const ticketRows = await insertTickets(connection, transactionId, tickets);
 
-      // products are optional — empty list is fine (ticket-only sale)
       if (productList.length > 0) {
         await insertProducts(connection, transactionId, productList);
+      }
+
+      if (enclosureIds.length > 0) {
+        await insertVisitedEnclosures(connection, transactionId, enclosureIds);
       }
 
       await connection.commit();
@@ -119,9 +184,8 @@ async function handleCheckout(req, res, pathname) {
 
       return sendJson(res, 201, {
         transactionId,
-        ticketId: ticketResult.insertId,
-        ticketType,
-        ticketPrice,
+        tickets: ticketRows,
+        paymentType,
         message: "Purchase complete"
       });
     } catch (error) {

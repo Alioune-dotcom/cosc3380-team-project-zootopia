@@ -44,6 +44,7 @@ async function handleAnimals(req, res, pathname) {
           a.Sex,
           a.DateOfBirth,
           a.AcquisitionDate,
+          a.IsSick,
           s.CommonName AS Species,
           s.ConservationStatus,
           e.Name AS Enclosure,
@@ -72,6 +73,12 @@ async function handleAnimals(req, res, pathname) {
         params.push(sex);
       }
 
+      const isSick = url.searchParams.get("isSick");
+      if (isSick === "0" || isSick === "1") {
+        sql += " AND a.IsSick = ?";
+        params.push(parseInt(isSick, 10));
+      }
+
       sql += " ORDER BY a.Name";
 
       const [rows] = await pool.query(sql, params);
@@ -92,6 +99,7 @@ async function handleAnimals(req, res, pathname) {
           a.Sex,
           a.DateOfBirth,
           a.AcquisitionDate,
+          a.IsSick,
           s.CommonName AS Species,
           e.Name AS Enclosure
         FROM animal a
@@ -130,14 +138,22 @@ async function handleAnimals(req, res, pathname) {
   if (req.method === "POST" && !id) {
     try {
       const body = await readBody(req);
-      const { Name, SpeciesID, EnclosureID, Sex, DateOfBirth, AcquisitionDate } = body;
+      const { Name, SpeciesID, EnclosureID, Sex, DateOfBirth, AcquisitionDate, IsSick } = body;
       if (!Name || !SpeciesID || !EnclosureID || !Sex || !AcquisitionDate) {
         return sendJson(res, 400, { error: "Missing required fields" });
       }
       const [result] = await pool.query(
-        `INSERT INTO animal (Name, SpeciesID, EnclosureID, Sex, DateOfBirth, AcquisitionDate)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [Name, SpeciesID, EnclosureID, Sex, DateOfBirth || null, AcquisitionDate]
+        `INSERT INTO animal (Name, SpeciesID, EnclosureID, Sex, DateOfBirth, AcquisitionDate, IsSick)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          Name,
+          SpeciesID,
+          EnclosureID,
+          Sex,
+          DateOfBirth || null,
+          AcquisitionDate,
+          IsSick ? 1 : 0
+        ]
       );
       return sendJson(res, 201, { AnimalID: result.insertId });
     } catch (error) {
@@ -150,13 +166,22 @@ async function handleAnimals(req, res, pathname) {
   if (req.method === "PUT" && id) {
     try {
       const body = await readBody(req);
-      const { Name, SpeciesID, EnclosureID, Sex, DateOfBirth, AcquisitionDate } = body;
+      const { Name, SpeciesID, EnclosureID, Sex, DateOfBirth, AcquisitionDate, IsSick } = body;
       const [result] = await pool.query(
         `UPDATE animal
          SET Name = ?, SpeciesID = ?, EnclosureID = ?, Sex = ?,
-             DateOfBirth = ?, AcquisitionDate = ?
+             DateOfBirth = ?, AcquisitionDate = ?, IsSick = ?
          WHERE AnimalID = ? AND IsDeleted = 0`,
-        [Name, SpeciesID, EnclosureID, Sex, DateOfBirth || null, AcquisitionDate, id]
+        [
+          Name,
+          SpeciesID,
+          EnclosureID,
+          Sex,
+          DateOfBirth || null,
+          AcquisitionDate,
+          IsSick ? 1 : 0,
+          id
+        ]
       );
 
       if (result.affectedRows === 0) {

@@ -12,6 +12,7 @@ const EMPTY_FORM = {
   Sex: '',
   DateOfBirth: '',
   AcquisitionDate: '',
+  IsSick: false,
 }
 
 // table columns. key = field name the backend sends back
@@ -21,6 +22,7 @@ const COLUMNS = [
   { key: 'Species', label: 'Species' },
   { key: 'Enclosure', label: 'Enclosure' },
   { key: 'Sex', label: 'Sex' },
+  { key: 'SickLabel', label: 'Sick' },
   { key: 'DateOfBirth', label: 'Born', isDate: true },
   { key: 'AcquisitionDate', label: 'Arrived', isDate: true },
 ]
@@ -37,7 +39,13 @@ function Animals() {
   async function loadAnimals() {
     try {
       const response = await fetch('/api/animals')
-      setAnimals(await response.json())
+      const data = await response.json()
+      setAnimals(
+        data.map((a) => ({
+          ...a,
+          SickLabel: a.IsSick ? 'Yes' : 'No',
+        }))
+      )
     } catch (err) {
       setMessage({ type: 'error', text: 'Could not load animals' })
     }
@@ -57,9 +65,9 @@ function Animals() {
     loadDropdowns()
   }, []) // [] = only run once, not every redraw
 
-  // one handler for every box, uses the input's name
   function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, type, checked, value } = e.target
+    setForm({ ...form, [name]: type === 'checkbox' ? checked : value })
   }
 
   // add or save changes
@@ -68,6 +76,15 @@ function Animals() {
 
     if (!form.Name || !form.SpeciesID || !form.EnclosureID || !form.Sex || !form.AcquisitionDate) {
       setMessage({ type: 'error', text: 'Please fill in every field (birth date is optional)' })
+      return
+    }
+
+    const picked = enclosures.find((e) => String(e.EnclosureID) === String(form.EnclosureID))
+    if (!form.IsSick && picked && picked.Name === 'Quarantine Ward') {
+      setMessage({
+        type: 'error',
+        text: 'Pick a normal habitat when the animal is not sick (quarantine is for sick animals only)',
+      })
       return
     }
 
@@ -110,9 +127,9 @@ function Animals() {
         SpeciesID: animal.SpeciesID,
         EnclosureID: animal.EnclosureID,
         Sex: animal.Sex,
-        // date boxes need YYYY-MM-DD
         DateOfBirth: animal.DateOfBirth ? animal.DateOfBirth.slice(0, 10) : '',
         AcquisitionDate: animal.AcquisitionDate.slice(0, 10),
+        IsSick: !!animal.IsSick,
       })
       setEditingId(row.AnimalID)
       setMessage(null)
@@ -151,6 +168,10 @@ function Animals() {
   return (
     <div>
       <h2>Animals</h2>
+      <p style={{ color: 'var(--muted)' }}>
+        Marking an animal sick moves them to Quarantine Ward and notifies managers. To recover,
+        clear Sick and choose a habitat — healthy animals cannot stay in quarantine.
+      </p>
 
       {message ? <p className={'message ' + message.type}>{message.text}</p> : null}
 
@@ -188,6 +209,14 @@ function Animals() {
 
         <label>Arrival date</label>
         <input type="date" name="AcquisitionDate" value={form.AcquisitionDate} onChange={handleChange} />
+
+        <label>Sick (→ quarantine)</label>
+        <input type="checkbox" name="IsSick" checked={form.IsSick} onChange={handleChange} />
+        {!form.IsSick ? (
+          <p style={{ gridColumn: '1 / 3', margin: 0, fontSize: 13, color: 'var(--muted)' }}>
+            If leaving quarantine, pick their habitat above.
+          </p>
+        ) : null}
 
         <div className="form-buttons">
           <button type="submit">{editingId ? 'Save changes' : 'Add animal'}</button>

@@ -2,30 +2,27 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { loginCustomer } from '../customerAuth.js'
 
-// customer login. checks username/password with the backend (/api/login)
 function CustomerLogin() {
-const [username, setUsername] = useState('')
-const [password, setPassword] = useState('')
-const [error, setError] = useState('')
-const navigate = useNavigate();
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const navigate = useNavigate()
 
-async function handleSubmit(e) {
-  e.preventDefault()
+  async function handleSubmit(e) {
+    e.preventDefault()
 
-  const cleanUsername = username.trim()
+    const cleanUsername = username.trim()
+    if (!cleanUsername || !password) {
+      setError('Please fill in both fields')
+      return
+    }
 
-  if (!cleanUsername || !password) {
-    setError('Please fill in both fields')
-    return
-  }
-
-  try {
-    // customers log in with their username (e.g. ava)
-    const response = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: cleanUsername, password }),
-    })
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUsername, password }),
+      })
       const data = await response.json()
 
       if (!response.ok) {
@@ -33,7 +30,6 @@ async function handleSubmit(e) {
         return
       }
 
-      // staff have their own login page
       if (data.role !== 'Customer') {
         setError('This login is for customers only')
         return
@@ -53,16 +49,22 @@ async function handleSubmit(e) {
         <h2>Customer Login</h2>
 
         <label>Username</label>
-        <input value={username} onChange={(e) => setUsername(e.target.value)} />
+        <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
 
         <label>Password</label>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+        />
 
         {error ? <p className="error">{error}</p> : null}
 
         <button type="submit">Log in</button>
 
         <p>Don't have an account? <Link to="/signup">Sign up</Link></p>
+        <p><Link to="/">← Back to Zootopia Zoo</Link></p>
       </form>
     </div>
   )

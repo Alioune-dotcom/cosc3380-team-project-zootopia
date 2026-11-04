@@ -8,29 +8,30 @@ DROP VIEW IF EXISTS v_customer_spending;
 DROP VIEW IF EXISTS v_product_sales;
 DROP VIEW IF EXISTS v_enclosure_occupancy;
 DROP VIEW IF EXISTS v_low_stock;
+DROP VIEW IF EXISTS v_closures_summary;
+DROP VIEW IF EXISTS v_most_visited_enclosures;
+DROP VIEW IF EXISTS v_revenue_summary;
+DROP VIEW IF EXISTS v_sick_animals;
 
--- Total for each sale: ticket + products (history — no IsDeleted on these tables)
+-- Total for each sale: tickets (qty * price) + products
 CREATE VIEW v_transaction_totals AS
 SELECT
   t.TransactionID,
   t.CustomerID,
   t.Date,
   t.PaymentType,
-  COALESCE(tk.UnitPrice, 0)
-    + COALESCE(SUM(tp.Quantity * tp.UnitPrice), 0) AS TotalAmount
-FROM `transaction` t
-LEFT JOIN ticket tk
-  ON tk.TransactionID = t.TransactionID
-LEFT JOIN transactionproduct tp
-  ON tp.TransactionID = t.TransactionID
-GROUP BY
-  t.TransactionID,
-  t.CustomerID,
-  t.Date,
-  t.PaymentType,
-  tk.UnitPrice;
+  COALESCE((
+    SELECT SUM(tk.Quantity * tk.UnitPrice)
+    FROM ticket tk
+    WHERE tk.TransactionID = t.TransactionID
+  ), 0)
+  + COALESCE((
+    SELECT SUM(tp.Quantity * tp.UnitPrice)
+    FROM transactionproduct tp
+    WHERE tp.TransactionID = t.TransactionID
+  ), 0) AS TotalAmount
+FROM `transaction` t;
 
--- Lifetime spend (keep soft-deleted customers so old sales still show)
 CREATE VIEW v_customer_spending AS
 SELECT
   c.CustomerID,
@@ -46,7 +47,6 @@ GROUP BY
   c.Email,
   c.IsDeleted;
 
--- Product sales (active products only in this catalog-style report)
 CREATE OR REPLACE VIEW v_product_sales AS
 SELECT
   p.ProductID,
@@ -63,7 +63,6 @@ GROUP BY
   p.Name,
   p.ShopID;
 
--- Animals vs capacity (ignore soft-deleted enclosures and animals)
 CREATE OR REPLACE VIEW v_enclosure_occupancy AS
 SELECT
   e.EnclosureID,
@@ -81,3 +80,56 @@ GROUP BY
   e.EnclosureID,
   e.Name,
   e.Capacity;
+
+CREATE OR REPLACE VIEW v_closures_summary AS
+SELECT
+  z.Scope,
+  z.Reason,
+  COUNT(*) AS ClosureCount,
+  MIN(z.Date) AS FirstDate,
+  MAX(z.Date) AS LastDate
+FROM zooclosure z
+GROUP BY
+  z.Scope,
+  z.Reason;
+
+CREATE OR REPLACE VIEW v_most_visited_enclosures AS
+SELECT
+  e.EnclosureID,
+  e.Name AS EnclosureName,
+  e.Location,
+  COUNT(te.TransactionID) AS VisitCount
+FROM enclosure e
+LEFT JOIN transaction_enclosure te
+  ON te.EnclosureID = e.EnclosureID
+WHERE e.IsDeleted = 0
+GROUP BY
+  e.EnclosureID,
+  e.Name,
+  e.Location;
+
+CREATE OR REPLACE VIEW v_revenue_summary AS
+SELECT
+  DATE(t.Date) AS SaleDate,
+  t.PaymentType,
+  COUNT(DISTINCT t.TransactionID) AS SaleCount,
+  COALESCE(SUM(vt.TotalAmount), 0) AS Revenue
+FROM `transaction` t
+LEFT JOIN v_transaction_totals vt
+  ON vt.TransactionID = t.TransactionID
+GROUP BY
+  DATE(t.Date),
+  t.PaymentType;
+
+CREATE OR REPLACE VIEW v_sick_animals AS
+SELECT
+  a.AnimalID,
+  a.Name AS AnimalName,
+  s.CommonName AS Species,
+  e.Name AS Enclosure,
+  a.IsSick
+FROM animal a
+JOIN species s ON s.SpeciesID = a.SpeciesID
+JOIN enclosure e ON e.EnclosureID = a.EnclosureID
+WHERE a.IsDeleted = 0
+  AND a.IsSick = 1;

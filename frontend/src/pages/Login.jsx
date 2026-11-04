@@ -1,57 +1,39 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
-
-// staff login. checks username/password with the backend (/api/login)
-
-
-
-
+import { Link, useNavigate } from 'react-router'
 
 function Login() {
-  // what's typed in each box
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-
-  // error message to show, empty = no error
   const [error, setError] = useState('')
-
-  // lets us change pages from code
   const navigate = useNavigate()
 
-   // async = this function waits for the backend to answer
-   async function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
-  
+
     const cleanUsername = username.trim()
-  
     if (!cleanUsername || !password) {
       setError('Please fill in both fields')
       return
     }
-  
+
     try {
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: cleanUsername, password }),
       })
-
-      // turn the backend's answer into an object
       const data = await response.json()
 
-      // backend said no (wrong username or password)
       if (!response.ok) {
         setError(data.error)
         return
       }
 
-      // customers have their own login page
       if (data.role === 'Customer') {
-        setError('This login is for staff only')
+        setError('Use Customer Login for guest accounts')
         return
       }
 
-      // remember who logged in
       setError('')
       localStorage.setItem('user', JSON.stringify({
         username: data.username,
@@ -60,7 +42,6 @@ function Login() {
       }))
       navigate('/dashboard')
     } catch (err) {
-      // couldn't reach the backend at all
       setError('Could not connect to the server')
     }
   }
@@ -68,24 +49,24 @@ function Login() {
   return (
     <div className="login-page">
       <form className="login-box" onSubmit={handleSubmit}>
-        <h2>Zoo Admin Login</h2>
+        <h2>Staff Login</h2>
 
         <label>Username</label>
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
+        <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
 
         <label>Password</label>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
         />
 
-               {error ? <p className="error">{error}</p> : null}
+        {error ? <p className="error">{error}</p> : null}
 
         <button type="submit">Log in</button>
+
+        <p><Link to="/">← Back to Zootopia Zoo</Link></p>
       </form>
     </div>
   )

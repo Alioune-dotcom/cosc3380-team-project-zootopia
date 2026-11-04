@@ -26,8 +26,8 @@ function DataTable({ columns, rows, rowKey, actions }) {
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => (
-          <tr key={row[rowKey]}>
+        {rows.map((row, index) => (
+          <tr key={typeof rowKey === 'function' ? rowKey(row) : row[rowKey] ?? index}>
             {columns.map((col) => (
               <td key={col.key}>{showValue(row[col.key], col)}</td>
             ))}

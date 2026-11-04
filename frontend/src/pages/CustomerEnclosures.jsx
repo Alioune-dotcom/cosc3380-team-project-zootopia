@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react'
+import { isPublicEnclosure } from '../zooInfo.js'
 
-// read-only: enclosures + which animals live in each (guest plaque view)
+const ANIMAL_PHOTOS = {
+  Lion: '/images/lion.jpg',
+  Elephant: '/images/elephant.jpg',
+  Penguin: '/images/penguin.jpg',
+  Giraffe: '/images/giraffe.jpg',
+  Zebra: '/images/zebra.png',
+}
+
 function CustomerEnclosures() {
   const [enclosures, setEnclosures] = useState([])
   const [animals, setAnimals] = useState([])
@@ -35,59 +43,51 @@ function CustomerEnclosures() {
   }, [])
 
   function animalsInEnclosure(enclosureName) {
-    return animals.filter((a) => a.Enclosure === enclosureName)
+    // guests only see healthy animals on exhibit (sick are quarantined)
+    return animals.filter((a) => a.Enclosure === enclosureName && !a.IsSick)
   }
 
   return (
     <div>
       <h1>Enclosures</h1>
+      <p style={{ color: 'var(--muted)' }}>Wander the park — tap a habitat to see who’s home.</p>
 
       {error ? <p className="error">{error}</p> : null}
 
-      {!error && enclosures.length === 0 ? (
-        <p>No enclosures to show.</p>
-      ) : null}
+      {!error && enclosures.length === 0 ? <p>No enclosures to show.</p> : null}
 
-      {enclosures.map((enc) => {
-        const residents = animalsInEnclosure(enc.Name)
-        return (
-          <section key={enc.EnclosureID} className="guest-section">
-            <h2>{enc.Name}</h2>
-            <p>
-              {enc.HabitatType} · {enc.Location} · Status: {enc.Status}
-            </p>
-
-            {residents.length === 0 ? (
-              <p>No animals listed here right now.</p>
-            ) : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Species</th>
-                    <th>Sex</th>
-                    <th>Born</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {residents.map((a) => (
-                    <tr key={a.AnimalID}>
-                      <td>{a.AnimalName}</td>
-                      <td>{a.Species}</td>
-                      <td>{a.Sex}</td>
-                      <td>
-                        {a.DateOfBirth
-                          ? String(a.DateOfBirth).slice(0, 10)
-                          : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
-        )
-      })}
+      <div className="report-grid">
+        {enclosures.filter(isPublicEnclosure).map((enc) => {
+          const residents = animalsInEnclosure(enc.Name)
+          const coverSpecies = residents[0]?.Species
+          return (
+            <article key={enc.EnclosureID} className="report-tile" style={{ padding: 0, overflow: 'hidden' }}>
+              <img
+                src={ANIMAL_PHOTOS[coverSpecies] || '/images/hero-zoo.jpg'}
+                alt={enc.Name}
+                style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
+              />
+              <div style={{ padding: 16 }}>
+                <h3 style={{ margin: '0 0 6px' }}>{enc.Name}</h3>
+                <p style={{ margin: '0 0 10px' }}>
+                  {enc.HabitatType} · {enc.Location} · {enc.Status}
+                </p>
+                {residents.length === 0 ? (
+                  <p style={{ margin: 0 }}>No animals listed right now.</p>
+                ) : (
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {residents.map((a) => (
+                      <li key={a.AnimalID}>
+                        {a.AnimalName} <span style={{ color: 'var(--muted)' }}>({a.Species})</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </article>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -40,6 +40,15 @@ const { handleCheckout } = require("./routes/checkout");
 // transactions route
 const { handleTransactions } = require("./routes/transactions");
 
+// alerts route
+const { handleAlerts } = require("./routes/alerts");
+
+// employees route
+const { handleEmployees } = require("./routes/employees");
+
+// customers route
+const { handleCustomers } = require("./routes/customers");
+
 function sendJson(res, statusCode, data) {
   res.writeHead(statusCode, { "Content-Type": "application/json" });
   res.end(JSON.stringify(data));
@@ -149,8 +158,23 @@ const server = http.createServer(async (req, res) => {
     return handleCheckout(req, res, pathname);
   }
 
-  if (pathname === "/api/my/transactions") {
+  if (
+    pathname === "/api/my/transactions" ||
+    pathname.startsWith("/api/my/transactions/")
+  ) {
     return handleTransactions(req, res, pathname);
+  }
+
+  if (pathname === "/api/alerts" || pathname.startsWith("/api/alerts/")) {
+    return handleAlerts(req, res, pathname);
+  }
+
+  if (pathname === "/api/employees" || pathname.startsWith("/api/employees/")) {
+    return handleEmployees(req, res, pathname);
+  }
+
+  if (pathname === "/api/customers" || pathname.startsWith("/api/customers/")) {
+    return handleCustomers(req, res, pathname);
   }
 
   if (

@@ -1,14 +1,9 @@
 import { NavLink, Outlet, useNavigate, Navigate } from 'react-router'
 
-// the frame every page sits in: top bar + sidebar
-// sidebar links depend on staff role (Cashier / Zookeeper / Manager)
 function Layout() {
   const navigate = useNavigate()
-
-  // get who's logged in (turn the saved text back into an object)
   const user = JSON.parse(localStorage.getItem('user'))
 
-  // nobody logged in -> send them to login
   if (!user) {
     return <Navigate to="/login" replace />
   }
@@ -18,62 +13,66 @@ function Layout() {
   const isZookeeper = role === 'Zookeeper'
   const isCashier = role === 'Cashier'
 
+  const headerLabel =
+    role === 'Manager'
+      ? 'Manager'
+      : role === 'Zookeeper'
+        ? 'Zookeeper'
+        : role === 'Cashier'
+          ? 'Cashier'
+          : 'Staff'
+
   function handleLogout() {
-    localStorage.removeItem('user') // forget who was logged in
+    localStorage.removeItem('user')
     navigate('/', { replace: true })
   }
 
   return (
     <div className="layout">
       <header className="topbar">
-        <span className="logo">Zoo Admin</span>
+        <span className="logo">{headerLabel}</span>
         <div className="user">
-          {/* who's logged in, saved by the login page */}
           <span>{user.username} ({user.role})</span>
           <button onClick={handleLogout}>Logout</button>
         </div>
       </header>
 
       <nav className="sidebar">
-        {/* everyone lands here after staff login */}
         <NavLink to="/dashboard">Dashboard</NavLink>
 
-        {(isZookeeper || isManager) && (
-          <NavLink to="/animals">Animals</NavLink>
+        {isZookeeper && (
+          <>
+            <NavLink to="/animals">Animals</NavLink>
+            <NavLink to="/staff/enclosures">Enclosures</NavLink>
+          </>
         )}
 
         {isManager && (
           <>
+            <NavLink to="/animals">Animals</NavLink>
+            <NavLink to="/staff/enclosures">Enclosures</NavLink>
+            <NavLink to="/staff/attractions">Attractions</NavLink>
             <NavLink to="/employees">Employees</NavLink>
             <NavLink to="/customers">Customers</NavLink>
+            <NavLink to="/closures">Closures</NavLink>
           </>
         )}
 
         {(isCashier || isManager) && (
-          <NavLink to="/products">Products</NavLink>
-        )}
-
-        {isManager && (
-          <NavLink to="/new-sale">New Sale</NavLink>
-        )}
-
-        <p className="nav-label">Queries</p>
-        {(isZookeeper || isManager) && (
           <>
-            <NavLink to="/queries/animals">Find Animals</NavLink>
-            <NavLink to="/queries/species">Find Species</NavLink>
+            <NavLink to="/products">Products</NavLink>
+            <NavLink to="/new-sale">New Sale</NavLink>
           </>
-        )}
-        {(isCashier || isManager) && (
-          <NavLink to="/queries/products">Find Products</NavLink>
         )}
 
         {isManager && (
           <>
             <p className="nav-label">Reports</p>
-            <NavLink to="/reports/occupancy">Enclosure Occupancy</NavLink>
-            <NavLink to="/reports/sales">Product Sales</NavLink>
-            <NavLink to="/reports/spending">Customer Spending</NavLink>
+            <NavLink to="/reports">Reports hub</NavLink>
+            <NavLink to="/reports/revenue">Revenue</NavLink>
+            <NavLink to="/reports/closures">Closures report</NavLink>
+            <NavLink to="/reports/occupancy">Occupancy</NavLink>
+            <NavLink to="/reports/most-visited">Most visited</NavLink>
           </>
         )}
       </nav>
