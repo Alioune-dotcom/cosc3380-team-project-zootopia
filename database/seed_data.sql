@@ -84,7 +84,9 @@ INSERT INTO `transaction` (TransactionID, CustomerID, Date, PaymentType) VALUES
 
 INSERT INTO ticket (TicketID, TransactionID, Type, UnitPrice) VALUES
 (1, 1, 'Adult', 29.99),
-(2, 2, 'Child', 19.99);
+(2, 2, 'Child', 19.99),
+(3, 1, 'Adult', 29.99),
+(4, 1, 'Child', 19.99);
 
 INSERT INTO transactionproduct (TransactionID, ProductID, Quantity, UnitPrice) VALUES
 (1, 1, 2, 18.99),

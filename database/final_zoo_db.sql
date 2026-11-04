@@ -294,7 +294,7 @@ CREATE TABLE `ticket` (
   `Type` varchar(20) NOT NULL,
   `UnitPrice` decimal(8,2) NOT NULL,
   PRIMARY KEY (`TicketID`),
-  UNIQUE KEY `TransactionID` (`TransactionID`),
+  KEY `TransactionID` (`TransactionID`),
   CONSTRAINT `ticket_ibfk_1` FOREIGN KEY (`TransactionID`) REFERENCES `transaction` (`TransactionID`),
   CONSTRAINT `ticket_chk_1` CHECK ((`UnitPrice` >= 0)),
   CONSTRAINT `ticket_chk_2` CHECK ((`Type` IN ('Adult','Child','Senior')))
@@ -317,10 +317,11 @@ CREATE TABLE `transaction` (
   `TransactionID` int NOT NULL AUTO_INCREMENT,
   `CustomerID` int NOT NULL,
   `Date` datetime NOT NULL,
-  `PaymentType` varchar(50) NOT NULL,
+  `PaymentType` varchar(10) NOT NULL,
   PRIMARY KEY (`TransactionID`),
   KEY `CustomerID` (`CustomerID`),
-  CONSTRAINT `transaction_ibfk_1` FOREIGN KEY (`CustomerID`) REFERENCES `customer` (`CustomerID`)
+  CONSTRAINT `transaction_ibfk_1` FOREIGN KEY (`CustomerID`) REFERENCES `customer` (`CustomerID`),
+  CONSTRAINT `transaction_chk_1` CHECK ((`PaymentType` IN ('Cash','Card')))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

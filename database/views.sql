@@ -9,26 +9,21 @@ DROP VIEW IF EXISTS v_product_sales;
 DROP VIEW IF EXISTS v_enclosure_occupancy;
 DROP VIEW IF EXISTS v_low_stock;
 
--- Total for each sale: ticket + products (history — no IsDeleted on these tables)
+-- Total for each sale: all tickets + all products (history — no IsDeleted on these tables)
+-- Tickets and products are summed separately so multiple tickets don't multiply product lines
 CREATE VIEW v_transaction_totals AS
 SELECT
   t.TransactionID,
   t.CustomerID,
   t.Date,
   t.PaymentType,
-  COALESCE(tk.UnitPrice, 0)
-    + COALESCE(SUM(tp.Quantity * tp.UnitPrice), 0) AS TotalAmount
-FROM `transaction` t
-LEFT JOIN ticket tk
-  ON tk.TransactionID = t.TransactionID
-LEFT JOIN transactionproduct tp
-  ON tp.TransactionID = t.TransactionID
-GROUP BY
-  t.TransactionID,
-  t.CustomerID,
-  t.Date,
-  t.PaymentType,
-  tk.UnitPrice;
+  COALESCE((SELECT SUM(tk.UnitPrice)
+            FROM ticket tk
+            WHERE tk.TransactionID = t.TransactionID), 0)
+  + COALESCE((SELECT SUM(tp.Quantity * tp.UnitPrice)
+              FROM transactionproduct tp
+              WHERE tp.TransactionID = t.TransactionID), 0) AS TotalAmount
+FROM `transaction` t;
 
 -- Lifetime spend (keep soft-deleted customers so old sales still show)
 CREATE VIEW v_customer_spending AS
