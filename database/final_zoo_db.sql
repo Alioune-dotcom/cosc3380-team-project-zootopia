@@ -5,7 +5,7 @@ USE `final_zoo_db`;
 -- Host: 127.0.0.1    Database: final_zoo_db
 -- ------------------------------------------------------
 -- Server version	8.0.46
--- Final schema: Users login, 1 Ticket per Transaction, Employee_Shop, soft delete (IsDeleted)
+-- Final schema: multi-ticket qty, PaymentType, IsSick, alerts, transaction_enclosure, soft delete
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -33,12 +33,14 @@ CREATE TABLE `animal` (
   `Sex` varchar(10) NOT NULL,
   `DateOfBirth` date DEFAULT NULL,
   `AcquisitionDate` date NOT NULL,
+  `IsSick` tinyint NOT NULL DEFAULT 0,
   `IsDeleted` tinyint NOT NULL DEFAULT 0,
   PRIMARY KEY (`AnimalID`),
   KEY `SpeciesID` (`SpeciesID`),
   KEY `EnclosureID` (`EnclosureID`),
   CONSTRAINT `animal_ibfk_1` FOREIGN KEY (`SpeciesID`) REFERENCES `species` (`SpeciesID`),
   CONSTRAINT `animal_ibfk_2` FOREIGN KEY (`EnclosureID`) REFERENCES `enclosure` (`EnclosureID`),
+  CONSTRAINT `animal_chk_sick` CHECK ((`IsSick` IN (0,1))),
   CONSTRAINT `animal_chk_deleted` CHECK ((`IsDeleted` IN (0,1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -292,12 +294,14 @@ CREATE TABLE `ticket` (
   `TicketID` int NOT NULL AUTO_INCREMENT,
   `TransactionID` int NOT NULL,
   `Type` varchar(20) NOT NULL,
+  `Quantity` int NOT NULL DEFAULT 1,
   `UnitPrice` decimal(8,2) NOT NULL,
   PRIMARY KEY (`TicketID`),
-  UNIQUE KEY `TransactionID` (`TransactionID`),
+  KEY `TransactionID` (`TransactionID`),
   CONSTRAINT `ticket_ibfk_1` FOREIGN KEY (`TransactionID`) REFERENCES `transaction` (`TransactionID`),
   CONSTRAINT `ticket_chk_1` CHECK ((`UnitPrice` >= 0)),
-  CONSTRAINT `ticket_chk_2` CHECK ((`Type` IN ('Adult','Child','Senior')))
+  CONSTRAINT `ticket_chk_2` CHECK ((`Type` IN ('Adult','Child','Senior'))),
+  CONSTRAINT `ticket_chk_3` CHECK ((`Quantity` > 0))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -354,6 +358,42 @@ LOCK TABLES `transactionproduct` WRITE;
 /*!40000 ALTER TABLE `transactionproduct` DISABLE KEYS */;
 /*!40000 ALTER TABLE `transactionproduct` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Enclosures visited during a sale (for most-visited report)
+--
+
+DROP TABLE IF EXISTS `transaction_enclosure`;
+CREATE TABLE `transaction_enclosure` (
+  `TransactionID` int NOT NULL,
+  `EnclosureID` int NOT NULL,
+  PRIMARY KEY (`TransactionID`,`EnclosureID`),
+  KEY `EnclosureID` (`EnclosureID`),
+  CONSTRAINT `transaction_enclosure_ibfk_1` FOREIGN KEY (`TransactionID`) REFERENCES `transaction` (`TransactionID`),
+  CONSTRAINT `transaction_enclosure_ibfk_2` FOREIGN KEY (`EnclosureID`) REFERENCES `enclosure` (`EnclosureID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Manager alerts (low stock, sick animals)
+--
+
+DROP TABLE IF EXISTS `alert`;
+CREATE TABLE `alert` (
+  `AlertID` int NOT NULL AUTO_INCREMENT,
+  `AlertType` varchar(30) NOT NULL,
+  `Message` varchar(255) NOT NULL,
+  `ProductID` int DEFAULT NULL,
+  `AnimalID` int DEFAULT NULL,
+  `CreatedAt` datetime NOT NULL,
+  `IsRead` tinyint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`AlertID`),
+  KEY `ProductID` (`ProductID`),
+  KEY `AnimalID` (`AnimalID`),
+  CONSTRAINT `alert_ibfk_1` FOREIGN KEY (`ProductID`) REFERENCES `product` (`ProductID`),
+  CONSTRAINT `alert_ibfk_2` FOREIGN KEY (`AnimalID`) REFERENCES `animal` (`AnimalID`),
+  CONSTRAINT `alert_chk_type` CHECK ((`AlertType` IN ('LowStock','SickAnimal'))),
+  CONSTRAINT `alert_chk_read` CHECK ((`IsRead` IN (0,1)))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Table structure for table `users`

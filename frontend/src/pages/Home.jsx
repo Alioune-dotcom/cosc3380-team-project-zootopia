@@ -3,12 +3,18 @@ import { Link } from 'react-router'
 import './Home.css'
 import { TICKETS } from '../zooInfo.js'
 
-// public front page, anyone can see this (no login)
-
 const HOURS = [
-  { days: 'Monday - Friday', time: '9am - 5pm' },
-  { days: 'Saturday - Sunday', time: '9am - 6pm' },
+  { days: 'Monday – Friday', time: '9am – 5pm' },
+  { days: 'Saturday – Sunday', time: '9am – 6pm' },
 ]
+
+const ANIMAL_PHOTOS = {
+  Lion: '/images/lion.jpg',
+  Elephant: '/images/elephant.jpg',
+  Penguin: '/images/penguin.jpg',
+  Giraffe: '/images/giraffe.jpg',
+  Zebra: '/images/zebra.png',
+}
 
 function Home() {
   const [animals, setAnimals] = useState([])
@@ -18,86 +24,99 @@ function Home() {
       try {
         const response = await fetch('/api/animals')
         const data = await response.json()
-        if (response.ok) {
-          setAnimals(data)
-        }
+        // public page: healthy animals on exhibit only (sick are in quarantine)
+        if (response.ok) setAnimals(data.filter((a) => !a.IsSick))
       } catch (err) {
-        // leave empty if the backend is down
+        // leave empty if backend is down
       }
     }
     loadAnimals()
   }, [])
 
   return (
-    <div className="home">
+    <div className="home-shell">
       <header className="home-header">
-        <span className="home-logo">Zoo Name</span>
+        <span className="home-logo">Zootopia Zoo</span>
         <nav>
-        <a href="#hours">Hours</a>
-        <a href="#tickets">Tickets</a>
-        <a href="#animals">Animals</a>
-        <Link to="/customer-login">Customer Login</Link>
-        <Link to="/signup">Sign Up</Link>
-        <Link to="/login">Staff Login</Link>
+          <a href="#hours">Hours</a>
+          <a href="#tickets">Tickets</a>
+          <a href="#animals">Animals</a>
+          <Link className="home-nav-cta" to="/customer-login">Customer Login</Link>
+          <Link to="/signup">Sign up</Link>
         </nav>
       </header>
 
       <section className="home-hero">
-        <h1>Welcome to the Zoo</h1>
-        <p>Short line about the zoo goes here.</p>
+        <img
+          className="home-hero-img"
+          src="/images/hero-zoo.jpg"
+          alt="Animals at Zootopia Zoo"
+        />
+        <div className="home-hero-copy">
+          <p className="home-eyebrow">Houston’s wildest day out</p>
+          <h1>Zootopia Zoo</h1>
+          <p>Buy tickets, wander enclosures, and meet animals from around the world.</p>
+          <div className="home-hero-actions">
+            <Link className="btn gold" to="/customer-login">Buy tickets</Link>
+            <a className="btn secondary" href="#animals">Meet the animals</a>
+          </div>
+        </div>
       </section>
 
-      <section id="hours" className="home-section">
-        <h2>Hours</h2>
-        <ul>
-          {/* .map turns each item in the list into a <li> */}
-          {HOURS.map((h) => (
-            <li key={h.days}>
-              {h.days}: {h.time}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section id="tickets" className="home-section">
-        <h2>Tickets</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Price</th>
-            </tr>
-          </thead>
-          <tbody>
-            {TICKETS.map((t) => (
-              <tr key={t.type}>
-                <td>{t.type}</td>
-                {/* toFixed(2) = always 2 decimals, like 19.90 */}
-                <td>${t.price.toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section id="animals" className="home-section">
-        <h2>Meet Our Animals</h2>
-        {animals.length === 0 ? (
-          <p>No animals to show right now.</p>
-        ) : (
-          <div className="animal-grid">
-            {animals.map((a) => (
-              <div key={a.AnimalID} className="animal-card">
-                <strong>{a.AnimalName}</strong>
-                <span>{a.Species}</span>
+      <main className="home-main">
+        <section id="hours" className="home-section">
+          <h2>Hours</h2>
+          <div className="hours-grid">
+            {HOURS.map((h) => (
+              <div key={h.days} className="hours-card">
+                <strong>{h.days}</strong>
+                <span>{h.time}</span>
               </div>
             ))}
           </div>
-        )}
-      </section>
+        </section>
+
+        <section id="tickets" className="home-section">
+          <h2>Tickets</h2>
+          <p className="home-lead">Mix Adult, Child, and Senior tickets in one purchase — pick quantities at checkout.</p>
+          <div className="ticket-grid">
+            {TICKETS.map((t) => (
+              <div key={t.type} className="ticket-card">
+                <span>{t.type}</span>
+                <strong>${t.price.toFixed(2)}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="animals" className="home-section">
+          <h2>Meet Our Animals</h2>
+          {animals.length === 0 ? (
+            <p>No animals to show right now.</p>
+          ) : (
+            <div className="animal-grid">
+              {animals.map((a) => (
+                <article key={a.AnimalID} className="animal-card">
+                  <img
+                    src={ANIMAL_PHOTOS[a.Species] || '/images/hero-zoo.jpg'}
+                    alt={a.AnimalName}
+                    className="animal-photo"
+                  />
+                  <div className="animal-meta">
+                    <strong>{a.AnimalName}</strong>
+                    <span>{a.Species}</span>
+                    <em>{a.Enclosure}</em>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
 
       <footer className="home-footer">
-        <p>© 2026 Zoo Name</p>
+        <p>© 2026 Zootopia Zoo</p>
+        <Link className="staff-link" to="/login">Staff login</Link>
       </footer>
     </div>
   )

@@ -1,4 +1,93 @@
+:root {
+  --forest: #163528;
+  --forest-deep: #0d2419;
+  --leaf: #2f6b4f;
+  --gold: #d4a017;
+  --gold-soft: #f0d78c;
+  --sand: #f6f1e6;
+  --sand-dark: #e8dfd0;
+  --ink: #1c241f;
+  --muted: #5c6b63;
+  --card: #ffffff;
+  --danger: #b33a2b;
+  --ok: #1f6b45;
+  --radius: 12px;
+  --shadow: 0 10px 30px rgba(22, 53, 40, 0.12);
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Outfit', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--sand);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: var(--leaf);
+}
+
+button,
+.btn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  background: var(--forest);
+  color: white;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover,
+.btn:hover {
+  background: var(--leaf);
+  transform: translateY(-1px);
+}
+
+button.secondary,
+.btn.secondary {
+  background: white;
+  color: var(--forest);
+  border: 1.5px solid var(--forest);
+}
+
+button.secondary:hover,
+.btn.secondary:hover {
+  background: var(--sand-dark);
+}
+
+button.gold,
+.btn.gold {
+  background: var(--gold);
+  color: var(--forest-deep);
+}
+
+button.gold:hover,
+.btn.gold:hover {
+  background: var(--gold-soft);
+}
+
+input, select, textarea {
+  font-family: var(--font-body);
+  padding: 9px 11px;
+  border: 1.5px solid #c9d2cb;
+  border-radius: 8px;
+  background: white;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid rgba(47, 107, 79, 0.35);
+  border-color: var(--leaf);
 }

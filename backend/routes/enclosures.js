@@ -34,7 +34,17 @@ async function handleEnclosures(req, res, pathname) {
   if (req.method === "GET" && !id) {
     try {
       const [rows] = await pool.query(
-        "SELECT * FROM enclosure WHERE IsDeleted = 0"
+        `SELECT
+           e.*,
+           (
+             SELECT COUNT(*)
+             FROM animal a
+             WHERE a.EnclosureID = e.EnclosureID
+               AND a.IsDeleted = 0
+           ) AS AnimalCount
+         FROM enclosure e
+         WHERE e.IsDeleted = 0
+         ORDER BY e.Name`
       );
       return sendJson(res, 200, rows);
     } catch (error) {
@@ -43,8 +53,46 @@ async function handleEnclosures(req, res, pathname) {
     }
   }
 
+  // GET /api/enclosures/:id/animals
+  if (req.method === "GET" && id && parts[3] === "animals") {
+    try {
+      const [encRows] = await pool.query(
+        "SELECT * FROM enclosure WHERE EnclosureID = ? AND IsDeleted = 0",
+        [id]
+      );
+      if (encRows.length === 0) {
+        return sendJson(res, 404, { error: "Enclosure not found" });
+      }
+
+      const [animals] = await pool.query(
+        `SELECT
+           a.AnimalID,
+           a.Name AS AnimalName,
+           a.Sex,
+           a.DateOfBirth,
+           a.IsSick,
+           s.CommonName AS Species
+         FROM animal a
+         JOIN species s ON s.SpeciesID = a.SpeciesID
+         WHERE a.EnclosureID = ?
+           AND a.IsDeleted = 0
+         ORDER BY a.Name`,
+        [id]
+      );
+
+      return sendJson(res, 200, {
+        enclosure: encRows[0],
+        animals,
+        animalCount: animals.length
+      });
+    } catch (error) {
+      console.error(error.message);
+      return sendJson(res, 500, { error: "Could not get enclosure animals" });
+    }
+  }
+
   // GET /api/enclosures/:id
-  if (req.method === "GET" && id) {
+  if (req.method === "GET" && id && !parts[3]) {
     try {
       const [rows] = await pool.query(
         "SELECT * FROM enclosure WHERE EnclosureID = ? AND IsDeleted = 0",
@@ -55,7 +103,17 @@ async function handleEnclosures(req, res, pathname) {
         return sendJson(res, 404, { error: "Enclosure not found" });
       }
 
-      return sendJson(res, 200, rows[0]);
+      const [countRows] = await pool.query(
+        `SELECT COUNT(*) AS AnimalCount
+         FROM animal
+         WHERE EnclosureID = ? AND IsDeleted = 0`,
+        [id]
+      );
+
+      return sendJson(res, 200, {
+        ...rows[0],
+        AnimalCount: countRows[0].AnimalCount
+      });
     } catch (error) {
       console.error(error.message);
       return sendJson(res, 500, { error: "Could not get enclosure" });
