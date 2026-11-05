@@ -50,6 +50,7 @@ function Layout() {
         {isManager && (
           <>
             <NavLink to="/animals">Animals</NavLink>
+            <NavLink to="/species">Species</NavLink>
             <NavLink to="/staff/enclosures">Enclosures</NavLink>
             <NavLink to="/staff/attractions">Attractions</NavLink>
             <NavLink to="/employees">Employees</NavLink>
