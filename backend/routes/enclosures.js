@@ -39,8 +39,10 @@ async function handleEnclosures(req, res, pathname) {
            (
              SELECT COUNT(*)
              FROM animal a
+             JOIN species s ON s.SpeciesID = a.SpeciesID
              WHERE a.EnclosureID = e.EnclosureID
-               AND a.IsDeleted = 0
+              AND a.IsDeleted = 0
+              AND s.IsDeleted = 0
            ) AS AnimalCount
          FROM enclosure e
          WHERE e.IsDeleted = 0
@@ -76,6 +78,7 @@ async function handleEnclosures(req, res, pathname) {
          JOIN species s ON s.SpeciesID = a.SpeciesID
          WHERE a.EnclosureID = ?
            AND a.IsDeleted = 0
+           AND s.IsDeleted = 0
          ORDER BY a.Name`,
         [id]
       );
@@ -105,8 +108,11 @@ async function handleEnclosures(req, res, pathname) {
 
       const [countRows] = await pool.query(
         `SELECT COUNT(*) AS AnimalCount
-         FROM animal
-         WHERE EnclosureID = ? AND IsDeleted = 0`,
+         FROM animal a
+         JOIN species s ON s.SpeciesID = a.SpeciesID
+         WHERE a.EnclosureID = ?
+         AND a.IsDeleted = 0
+         AND s.IsDeleted = 0`,
         [id]
       );
 
@@ -185,30 +191,59 @@ if (req.method === "POST" && id === "reopen-all") {
     }
   }
 
-  // DELETE /api/enclosures/:id  (soft delete + cascade it to attractions)
-  if (req.method === "DELETE" && id) {
-    try {
-      const [result] = await pool.query(
-        "UPDATE enclosure SET IsDeleted = 1 WHERE EnclosureID = ? AND IsDeleted = 0",
-        [id]
-      );
 
-      if (result.affectedRows === 0) {
-        return sendJson(res, 404, { error: "Enclosure not found" });
-      }
+if (req.method === "DELETE" && id) {
+  try {
+    // Check whether the enclosure still contains active animals
+    const [animalRows] = await pool.query(
+      `SELECT COUNT(*) AS AnimalCount
+       FROM animal
+       WHERE EnclosureID = ?
+         AND IsDeleted = 0`,
+      [id]
+    );
 
-      // also hide attractions that belonged to this enclosure
-      await pool.query(
-        "UPDATE attraction SET IsDeleted = 1 WHERE EnclosureID = ? AND IsDeleted = 0",
-        [id]
-      );
+    const animalCount = animalRows[0].AnimalCount;
 
-      return sendJson(res, 200, { message: "Enclosure deleted" });
-    } catch (error) {
-      console.error(error.message);
-      return sendJson(res, 500, { error: "Could not delete enclosure" });
+    // Prevent deletion if animals are still assigned
+    if (animalCount > 0) {
+      return sendJson(res, 409, {
+        error: `Cannot delete this enclosure because it still contains ${animalCount} active animal(s). Please reassign the animals first.`
+      });
     }
+
+    // Soft-delete the enclosure
+    const [result] = await pool.query(
+      `UPDATE enclosure
+       SET IsDeleted = 1
+       WHERE EnclosureID = ?
+         AND IsDeleted = 0`,
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return sendJson(res, 404, { error: "Enclosure not found" });
+    }
+
+    // Also hide attractions that belonged to this enclosure
+    await pool.query(
+      `UPDATE attraction
+       SET IsDeleted = 1
+       WHERE EnclosureID = ?
+         AND IsDeleted = 0`,
+      [id]
+    );
+
+    return sendJson(res, 200, {
+      message: "Enclosure deleted"
+    });
+  } catch (error) {
+    console.error(error.message);
+    return sendJson(res, 500, {
+      error: "Could not delete enclosure"
+    });
   }
+}
 
   sendJson(res, 404, { error: "Route not found" });
 }
