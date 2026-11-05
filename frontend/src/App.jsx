@@ -18,6 +18,7 @@ import {
   MostVisitedReport,
 } from './pages/Reports.jsx'
 import Products from './pages/Products.jsx'
+import Species from './pages/Species.jsx'
 import CustomerLayout from './components/CustomerLayout.jsx'
 import MyTransactions from './pages/MyTransactions.jsx'
 import CustomerEnclosures from './pages/CustomerEnclosures.jsx'
@@ -49,6 +50,7 @@ function App() {
       <Route element={<Layout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/animals" element={<Animals />} />
+        <Route path="/species" element={<Species />} />
         <Route path="/staff/enclosures" element={<Enclosures />} />
         <Route path="/staff/enclosures/:id" element={<Enclosures />} />
         <Route path="/staff/attractions" element={<Attractions />} />
