@@ -28,7 +28,8 @@ function CustomerLayout() {
       <nav className="sidebar">
         <NavLink to="/enclosures">Enclosures</NavLink>
         <NavLink to="/attractions">Attractions</NavLink>
-        <NavLink to="/checkout">Checkout</NavLink>
+        <NavLink to="/checkout">Buy Tickets</NavLink>
+        <NavLink to="/shop">Gift Shop & Food</NavLink>
         <NavLink to="/my-transactions">My Transactions</NavLink>
       </nav>
 

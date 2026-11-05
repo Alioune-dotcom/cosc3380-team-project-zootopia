@@ -170,6 +170,15 @@
   transition: transform 0.2s ease;
 }
 
+.animal-card { position: relative; }
+.animal-card.unavailable .animal-photo { filter: grayscale(100%); opacity: 0.6; }
+.animal-badge {
+  position: absolute; top: 10px; left: 10px;
+  background: #b45309; color: #fff;
+  padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+}
+.animal-card.unavailable em { color: #b45309; font-style: normal; }
+
 .animal-card:hover {
   transform: translateY(-4px);
 }

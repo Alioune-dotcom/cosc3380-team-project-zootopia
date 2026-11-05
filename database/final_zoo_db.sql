@@ -35,11 +35,13 @@ CREATE TABLE `animal` (
   `AcquisitionDate` date NOT NULL,
   `IsSick` tinyint NOT NULL DEFAULT 0,
   `IsDeleted` tinyint NOT NULL DEFAULT 0,
+  `HomeEnclosureID` int DEFAULT NULL,
   PRIMARY KEY (`AnimalID`),
   KEY `SpeciesID` (`SpeciesID`),
   KEY `EnclosureID` (`EnclosureID`),
   CONSTRAINT `animal_ibfk_1` FOREIGN KEY (`SpeciesID`) REFERENCES `species` (`SpeciesID`),
   CONSTRAINT `animal_ibfk_2` FOREIGN KEY (`EnclosureID`) REFERENCES `enclosure` (`EnclosureID`),
+  CONSTRAINT `animal_ibfk_3` FOREIGN KEY (`HomeEnclosureID`) REFERENCES `enclosure` (`EnclosureID`),
   CONSTRAINT `animal_chk_sick` CHECK ((`IsSick` IN (0,1))),
   CONSTRAINT `animal_chk_deleted` CHECK ((`IsDeleted` IN (0,1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

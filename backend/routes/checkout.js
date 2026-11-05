@@ -121,7 +121,7 @@ async function insertVisitedEnclosures(connection, transactionId, enclosureIds) 
 }
 
 async function handleCheckout(req, res, pathname) {
-  // POST /api/checkout — tickets required, products + visits optional
+  // POST /api/checkout — needs a ticket or a product; enclosure visits need a ticket
   if (req.method === "POST" && pathname === "/api/checkout") {
     let connection;
 
@@ -145,8 +145,12 @@ async function handleCheckout(req, res, pathname) {
         return sendJson(res, 400, { error: "PaymentType must be Cash or Card" });
       }
 
-      if (tickets.length === 0) {
-        return sendJson(res, 400, { error: "At least one ticket is required" });
+      if (tickets.length === 0 && productList.length === 0) {
+        return sendJson(res, 400, { error: "Add at least one ticket or product" });
+      }
+
+      if (tickets.length === 0 && enclosureIds.length > 0) {
+        return sendJson(res, 400, { error: "Visiting enclosures requires a ticket" });
       }
 
       connection = await pool.getConnection();
@@ -167,9 +171,12 @@ async function handleCheckout(req, res, pathname) {
          VALUES (?, NOW(), ?)`,
         [customerId, paymentType]
       );
+
       const transactionId = txResult.insertId;
 
-      const ticketRows = await insertTickets(connection, transactionId, tickets);
+      const ticketRows = tickets.length > 0
+        ? await insertTickets(connection, transactionId, tickets)
+        : [];
 
       if (productList.length > 0) {
         await insertProducts(connection, transactionId, productList);

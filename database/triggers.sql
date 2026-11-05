@@ -29,6 +29,10 @@ BEGIN
   LIMIT 1;
 
   IF NEW.`IsSick` = 1 THEN
+    -- remember the usual habitat (unless it was entered straight into quarantine)
+    IF quarantine_id IS NULL OR NEW.`EnclosureID` <> quarantine_id THEN
+      SET NEW.`HomeEnclosureID` = NEW.`EnclosureID`;
+    END IF;
     IF quarantine_id IS NULL THEN
       SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Quarantine Ward enclosure is missing; cannot house a sick animal.';
@@ -54,6 +58,10 @@ BEGIN
   LIMIT 1;
 
   IF NEW.`IsSick` = 1 THEN
+    -- remember the usual habitat when the animal first gets sick
+    IF OLD.`IsSick` = 0 THEN
+      SET NEW.`HomeEnclosureID` = OLD.`EnclosureID`;
+    END IF;
     IF quarantine_id IS NULL THEN
       SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'Quarantine Ward enclosure is missing; cannot house a sick animal.';
