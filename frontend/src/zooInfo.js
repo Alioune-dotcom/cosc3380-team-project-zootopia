@@ -14,3 +14,12 @@ export function isPublicEnclosure(enclosure) {
   if (enclosure.HabitatType === 'Medical') return false
   return true
 }
+
+// sick or in quarantine = not on public display
+export function isAnimalUnavailable(animal) {
+  if (!animal) return false
+  return Number(animal.IsSick) === 1 || animal.Enclosure === 'Quarantine Ward'
+}
+
+export const UNAVAILABLE_MESSAGE =
+  'Resting with our vet team and not on display today. Come back and visit again soon!'

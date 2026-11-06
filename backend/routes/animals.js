@@ -100,6 +100,7 @@ async function handleAnimals(req, res, pathname) {
           a.DateOfBirth,
           a.AcquisitionDate,
           a.IsSick,
+          a.EnclosureID,
           s.CommonName AS Species,
           e.Name AS Enclosure
         FROM animal a

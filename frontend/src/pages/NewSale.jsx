@@ -1,40 +1,54 @@
 import { useEffect, useState } from 'react'
-import { TICKETS, isPublicEnclosure } from '../zooInfo.js'
 
-// manager/cashier in-person sale (same checkout API)
+// in-person sale at a gift shop or food stand
+// no customer is recorded; the sale stores the shop, the cashier, and the items
+// cashiers only see the shops they're assigned to; managers can pick any shop
 function NewSale() {
-  const [customers, setCustomers] = useState([])
-  const [products, setProducts] = useState([])
-  const [enclosures, setEnclosures] = useState([])
-  const [customerId, setCustomerId] = useState('')
-  const [ticketQty, setTicketQty] = useState({ Adult: 1, Child: 0, Senior: 0 })
-  const [qtyById, setQtyById] = useState({})
-  const [selectedEnclosures, setSelectedEnclosures] = useState([])
-  const [paymentType, setPaymentType] = useState('Cash')
-  const [message, setMessage] = useState('')
+  const user = JSON.parse(localStorage.getItem('user'))
+  const isManager = user?.role === 'Manager'
 
+  const [shops, setShops] = useState([])
+  const [shopId, setShopId] = useState('')
+  const [products, setProducts] = useState([])
+  const [qtyById, setQtyById] = useState({})
+  const [paymentType, setPaymentType] = useState('Cash')
+  const [message, setMessage] = useState(null) // { type, text }
+
+  // load the shops this employee can sell at (never the online store)
   useEffect(() => {
-    async function load() {
-      const [c, p, e] = await Promise.all([
-        fetch('/api/customers'),
-        fetch('/api/products'),
-        fetch('/api/enclosures'),
-      ])
-      if (c.ok) setCustomers(await c.json())
-      if (p.ok) setProducts(await p.json())
-      if (e.ok) {
-        const all = await e.json()
-        setEnclosures(all.filter(isPublicEnclosure))
+    async function loadShops() {
+      try {
+        const url = isManager ? '/api/shops' : '/api/employees/' + user.employeeId + '/shops'
+        const response = await fetch(url)
+        const data = await response.json()
+        if (!response.ok) {
+          setMessage({ type: 'error', text: data.error || 'Could not load shops' })
+          return
+        }
+        const physical = data.filter((s) => s.ShopType !== 'Online')
+        setShops(physical)
+        if (physical.length === 1) setShopId(String(physical[0].ShopID))
+      } catch (err) {
+        setMessage({ type: 'error', text: 'Could not connect to the server' })
       }
     }
-    load()
-  }, [])
+    loadShops()
+  }, [isManager, user?.employeeId])
 
-  const ticketLines = TICKETS.map((t) => ({
-    type: t.type,
-    quantity: parseInt(ticketQty[t.type], 10) || 0,
-    price: t.price,
-  })).filter((t) => t.quantity > 0)
+  async function loadProducts(id) {
+    if (!id) {
+      setProducts([])
+      return
+    }
+    const response = await fetch('/api/products?shopId=' + id)
+    if (response.ok) setProducts(await response.json())
+  }
+
+  // when the shop changes, show only that shop's products
+  useEffect(() => {
+    setQtyById({})
+    loadProducts(shopId)
+  }, [shopId])
 
   const selectedProducts = products
     .map((p) => ({
@@ -44,157 +58,131 @@ function NewSale() {
     }))
     .filter((p) => p.quantity > 0)
 
-  const total =
-    ticketLines.reduce((s, t) => s + t.price * t.quantity, 0) +
-    selectedProducts.reduce((s, p) => s + p.price * p.quantity, 0)
-
-  function toggleEnclosure(id) {
-    if (selectedEnclosures.includes(id)) {
-      setSelectedEnclosures(selectedEnclosures.filter((e) => e !== id))
-    } else {
-      setSelectedEnclosures([...selectedEnclosures, id])
-    }
-  }
+  const total = selectedProducts.reduce((s, p) => s + p.price * p.quantity, 0)
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setMessage('')
+    setMessage(null)
 
-    if (!customerId) {
-      setMessage('Pick a customer')
+    if (!shopId) {
+      setMessage({ type: 'error', text: 'Pick a shop' })
       return
     }
-    if (ticketLines.length === 0) {
-      setMessage('Add at least one ticket')
-      return
-    }
+if (selectedProducts.length === 0) {
+  setMessage({ type: 'error', text: 'Add at least one product' })
+  return
+}
 
     try {
-      const response = await fetch('/api/checkout', {
+      const response = await fetch('/api/sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerId: Number(customerId),
+          employeeId: user.employeeId,
+          shopId: Number(shopId),
           paymentType,
-          tickets: ticketLines.map((t) => ({ type: t.type, quantity: t.quantity })),
           products: selectedProducts.map((p) => ({
             productId: p.productId,
             quantity: p.quantity,
           })),
-          enclosureIds: selectedEnclosures,
         }),
       })
       const data = await response.json()
       if (!response.ok) {
-        setMessage(data.error || 'Sale failed')
+        setMessage({ type: 'error', text: data.error || 'Sale failed' })
         return
       }
-      setMessage('Sale recorded. Transaction #' + data.transactionId + ' — $' + total.toFixed(2))
-      setTicketQty({ Adult: 1, Child: 0, Senior: 0 })
+      setMessage({ type: 'success', text: 'Sale recorded. Transaction #' + data.transactionId })
       setQtyById({})
-      setSelectedEnclosures([])
-      const refresh = await fetch('/api/products')
-      if (refresh.ok) setProducts(await refresh.json())
+      loadProducts(shopId)
     } catch (err) {
-      setMessage('Could not connect to the server')
+      setMessage({ type: 'error', text: 'Could not connect to the server' })
     }
   }
 
   return (
     <div>
       <h2>New Sale</h2>
-      <p style={{ color: 'var(--muted)' }}>In-person sale: mix ticket types, optional products, Cash or Card.</p>
+      <p style={{ color: 'var(--muted)' }}>
+        Ring up an in-person sale at a gift shop or food stand. Cash or Card.
+      </p>
+
       <form className="page-card" onSubmit={handleSubmit}>
-        <label>Customer</label>
-        <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-          <option value="">-- pick one --</option>
-          {customers.map((c) => (
-            <option key={c.CustomerID} value={c.CustomerID}>
-              {c.Username || c.Email} ({c.Email})
-            </option>
-          ))}
-        </select>
-
-        <h3>Tickets</h3>
-        {TICKETS.map((t) => (
-          <div key={t.type} className="qty-row">
-            <div>
-              <strong>{t.type}</strong>
-              <div style={{ color: 'var(--muted)' }}>${t.price.toFixed(2)}</div>
-            </div>
-            <input
-              type="number"
-              min="0"
-              value={ticketQty[t.type] || ''}
-              onChange={(e) => setTicketQty({ ...ticketQty, [t.type]: e.target.value })}
-              style={{ width: 70 }}
-            />
-          </div>
-        ))}
-
-        <h3>Products</h3>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Stock</th>
-              <th>Price</th>
-              <th>Qty</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p) => (
-              <tr key={p.ProductID}>
-                <td>{p.Name}</td>
-                <td>{p.QuantityInStock}</td>
-                <td>${Number(p.Price).toFixed(2)}</td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    value={qtyById[p.ProductID] ?? ''}
-                    onChange={(e) => setQtyById({ ...qtyById, [p.ProductID]: e.target.value })}
-                    style={{ width: 60 }}
-                  />
-                </td>
-              </tr>
+        <label>Shop</label>
+        {shops.length === 0 ? (
+          <p>You aren't assigned to any shops yet. Ask a manager to assign you.</p>
+        ) : (
+          <select value={shopId} onChange={(e) => setShopId(e.target.value)}>
+            <option value="">-- pick one --</option>
+            {shops.map((s) => (
+              <option key={s.ShopID} value={s.ShopID}>
+                {s.Name} ({s.ShopType} · {s.Location})
+              </option>
             ))}
-          </tbody>
-        </table>
+          </select>
+        )}
 
-        <h3>Enclosures visited</h3>
-        {enclosures.map((enc) => (
-          <label key={enc.EnclosureID} style={{ display: 'block', marginBottom: 4 }}>
-            <input
-              type="checkbox"
-              checked={selectedEnclosures.includes(enc.EnclosureID)}
-              onChange={() => toggleEnclosure(enc.EnclosureID)}
-            />{' '}
-            {enc.Name}
-          </label>
-        ))}
+        {shopId ? (
+          <>
+            <h3>Products</h3>
+            {products.length === 0 ? (
+              <p>This shop has no products.</p>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Stock</th>
+                    <th>Price</th>
+                    <th>Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((p) => (
+                    <tr key={p.ProductID}>
+                      <td>{p.Name}</td>
+                      <td>{p.QuantityInStock}</td>
+                      <td>${Number(p.Price).toFixed(2)}</td>
+                      <td>
+                        <input
+                          type="number"
+                          min="0"
+                          max={p.QuantityInStock}
+                          value={qtyById[p.ProductID] ?? ''}
+                          onChange={(e) => setQtyById({ ...qtyById, [p.ProductID]: e.target.value })}
+                          style={{ width: 60 }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
-        <h3>Payment</h3>
-        <div className="payment-cards">
-          <button
-            type="button"
-            className={'payment-card' + (paymentType === 'Cash' ? ' selected' : '')}
-            onClick={() => setPaymentType('Cash')}
-          >
-            Cash
-          </button>
-          <button
-            type="button"
-            className={'payment-card' + (paymentType === 'Card' ? ' selected' : '')}
-            onClick={() => setPaymentType('Card')}
-          >
-            Card
-          </button>
-        </div>
+            <h3>Payment</h3>
+            <div className="payment-cards">
+              <button
+                type="button"
+                className={'payment-card' + (paymentType === 'Cash' ? ' selected' : '')}
+                onClick={() => setPaymentType('Cash')}
+              >
+                Cash
+              </button>
+              <button
+                type="button"
+                className={'payment-card' + (paymentType === 'Card' ? ' selected' : '')}
+                onClick={() => setPaymentType('Card')}
+              >
+                Card
+              </button>
+            </div>
 
-        <p><strong>Total: ${total.toFixed(2)}</strong></p>
-        <button type="submit" className="gold">Record sale</button>
-        {message ? <p className="message success">{message}</p> : null}
+            <p><strong>Total: ${total.toFixed(2)}</strong></p>
+            <button type="submit" className="gold">Record sale</button>
+          </>
+        ) : null}
+
+        {message ? <p className={'message ' + message.type}>{message.text}</p> : null}
       </form>
     </div>
   )

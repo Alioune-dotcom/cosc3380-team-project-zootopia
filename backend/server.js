@@ -156,7 +156,8 @@ const server = http.createServer(async (req, res) => {
     return handleAuth(req, res, pathname);
   }
 
-  if (pathname === "/api/checkout") {
+  // /api/checkout = online purchase, /api/sales = in-person cashier sale
+  if (pathname === "/api/checkout" || pathname === "/api/sales") {
     return handleCheckout(req, res, pathname);
   }
 

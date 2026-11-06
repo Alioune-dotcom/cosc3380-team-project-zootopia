@@ -8,6 +8,7 @@ import Signup from './pages/Signup.jsx'
 import Checkout from './pages/Checkout.jsx'
 import './App.css'
 import Animals from './pages/Animals.jsx'
+import Shop from './pages/Shop.jsx'
 import {
   ReportsHub,
   RevenueReports,
@@ -27,6 +28,8 @@ import Attractions from './pages/Attractions.jsx'
 import Closures from './pages/Closures.jsx'
 import NewSale from './pages/NewSale.jsx'
 import CustomerLogin from './pages/CustomerLogin.jsx'
+import OnlineShop from './pages/OnlineShop.jsx'
+import Shops from './pages/Shops.jsx'
 
 function App() {
   return (
@@ -37,9 +40,11 @@ function App() {
       <Route path="/customer-login" element={<CustomerLogin />} />
 
       <Route element={<CustomerLayout />}>
+        <Route path="/shop" element={<Shop />} />
         <Route path="/enclosures" element={<CustomerEnclosures />} />
         <Route path="/attractions" element={<CustomerAttractions />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/shop" element={<OnlineShop />} />
         <Route path="/my-transactions" element={<MyTransactions />} />
         <Route path="/my-transactions/:id" element={<MyTransactions />} />
       </Route>
@@ -54,6 +59,7 @@ function App() {
         <Route path="/employees" element={<Employees />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/closures" element={<Closures />} />
+        <Route path="/shops" element={<Shops />} />
         <Route path="/products" element={<Products />} />
         <Route path="/new-sale" element={<NewSale />} />
         <Route path="/reports" element={<ReportsHub />} />

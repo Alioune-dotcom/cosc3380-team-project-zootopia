@@ -25,17 +25,54 @@ function readBody(req) {
   });
 }
 
+// empty strings from the form become NULL
+function optionalInt(value) {
+  if (value === undefined || value === null || value === "") return null;
+  return parseInt(value, 10);
+}
+
 async function handleAttractions(req, res, pathname) {
   // /api/attractions or /api/attractions/1
   const parts = pathname.split("/").filter(Boolean);
   const id = parts[2];
+  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
-  // GET /api/attractions
+  // GET /api/attractions          — staff: every attraction
+  // GET /api/attractions?public=1 — customers: hides ones whose enclosure is
+  //   closed, or that fall on a day the zoo / enclosure is closed
   if (req.method === "GET" && !id) {
     try {
-      const [rows] = await pool.query(
-        "SELECT * FROM attraction WHERE IsDeleted = 0"
-      );
+      let sql = `
+        SELECT
+          a.AttractionID,
+          a.Name,
+          a.Type,
+          a.Schedule,
+          a.DurationMinutes,
+          a.EnclosureID,
+          e.Name AS EnclosureName,
+          a.HostEmployeeID,
+          CONCAT(h.FirstName, ' ', h.LastName) AS HostName
+        FROM attraction a
+        JOIN enclosure e ON e.EnclosureID = a.EnclosureID
+        LEFT JOIN employee h ON h.EmployeeID = a.HostEmployeeID
+        WHERE a.IsDeleted = 0
+      `;
+
+      if (url.searchParams.get("public") === "1") {
+        sql += `
+          AND e.IsDeleted = 0
+          AND e.Status = 'Open'
+          AND NOT EXISTS (
+            SELECT 1 FROM zooclosure z
+            WHERE z.Date = DATE(a.Schedule)
+              AND (z.Scope = 'FullZoo' OR z.EnclosureID = a.EnclosureID)
+          )
+        `;
+      }
+
+      sql += " ORDER BY a.Schedule";
+      const [rows] = await pool.query(sql);
       return sendJson(res, 200, rows);
     } catch (error) {
       console.error(error.message);
@@ -67,15 +104,17 @@ async function handleAttractions(req, res, pathname) {
     try {
       const body = await readBody(req);
       const { Name, Type, Schedule, EnclosureID } = body;
+      const DurationMinutes = optionalInt(body.DurationMinutes);
+      const HostEmployeeID = optionalInt(body.HostEmployeeID);
 
       if (!Name || !Type || !Schedule || !EnclosureID) {
         return sendJson(res, 400, { error: "Missing required fields" });
       }
 
       const [result] = await pool.query(
-        `INSERT INTO attraction (Name, Type, Schedule, EnclosureID)
-         VALUES (?, ?, ?, ?)`,
-        [Name, Type, Schedule, EnclosureID]
+        `INSERT INTO attraction (Name, Type, Schedule, DurationMinutes, EnclosureID, HostEmployeeID)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [Name, Type, Schedule, DurationMinutes, EnclosureID, HostEmployeeID]
       );
 
       return sendJson(res, 201, { AttractionID: result.insertId });
@@ -90,12 +129,14 @@ async function handleAttractions(req, res, pathname) {
     try {
       const body = await readBody(req);
       const { Name, Type, Schedule, EnclosureID } = body;
+      const DurationMinutes = optionalInt(body.DurationMinutes);
+      const HostEmployeeID = optionalInt(body.HostEmployeeID);
 
       const [result] = await pool.query(
         `UPDATE attraction
-         SET Name = ?, Type = ?, Schedule = ?, EnclosureID = ?
+         SET Name = ?, Type = ?, Schedule = ?, DurationMinutes = ?, EnclosureID = ?, HostEmployeeID = ?
          WHERE AttractionID = ? AND IsDeleted = 0`,
-        [Name, Type, Schedule, EnclosureID, id]
+        [Name, Type, Schedule, DurationMinutes, EnclosureID, HostEmployeeID, id]
       );
 
       if (result.affectedRows === 0) {

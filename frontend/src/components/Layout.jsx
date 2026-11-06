@@ -56,6 +56,7 @@ function Layout() {
             <NavLink to="/employees">Employees</NavLink>
             <NavLink to="/customers">Customers</NavLink>
             <NavLink to="/closures">Closures</NavLink>
+            <NavLink to="/shops">Shops</NavLink>
           </>
         )}
 

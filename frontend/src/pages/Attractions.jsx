@@ -5,7 +5,9 @@ const EMPTY_FORM = {
   Name: '',
   Type: 'Talk',
   Schedule: '',
+  DurationMinutes: '',
   EnclosureID: '',
+  HostEmployeeID: '',
 }
 
 const COLUMNS = [
@@ -13,29 +15,35 @@ const COLUMNS = [
   { key: 'Name', label: 'Name' },
   { key: 'Type', label: 'Type' },
   { key: 'Schedule', label: 'Schedule' },
+  { key: 'DurationMinutes', label: 'Minutes' },
   { key: 'EnclosureName', label: 'Enclosure' },
+  { key: 'HostName', label: 'Host' },
 ]
 
 function Attractions() {
   const [rows, setRows] = useState([])
   const [enclosures, setEnclosures] = useState([])
+  const [zookeepers, setZookeepers] = useState([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [editingId, setEditingId] = useState(null)
   const [message, setMessage] = useState(null)
 
   async function load() {
     try {
-      const [aRes, eRes] = await Promise.all([
+      const [aRes, eRes, empRes] = await Promise.all([
         fetch('/api/attractions'),
         fetch('/api/enclosures'),
+        fetch('/api/employees'),
       ])
       const attractions = await aRes.json()
       const encs = await eRes.json()
+      const employees = await empRes.json()
       setEnclosures(encs)
+      // only zookeepers host talks and shows
+      setZookeepers(Array.isArray(employees) ? employees.filter((emp) => emp.Role === 'Zookeeper') : [])
       setRows(
         attractions.map((a) => ({
           ...a,
-          EnclosureName: encs.find((e) => e.EnclosureID === a.EnclosureID)?.Name || a.EnclosureID,
           Schedule: a.Schedule ? String(a.Schedule).slice(0, 16).replace('T', ' ') : '',
         }))
       )
@@ -88,7 +96,9 @@ function Attractions() {
       Name: row.Name,
       Type: row.Type,
       Schedule: String(row.Schedule).slice(0, 16).replace(' ', 'T'),
+      DurationMinutes: row.DurationMinutes ?? '',
       EnclosureID: row.EnclosureID,
+      HostEmployeeID: row.HostEmployeeID ?? '',
     })
     setEditingId(row.AttractionID)
     setMessage(null)
@@ -126,11 +136,20 @@ function Attractions() {
         </select>
         <label>Schedule</label>
         <input type="datetime-local" name="Schedule" value={form.Schedule} onChange={handleChange} />
+        <label>Duration (minutes, optional)</label>
+        <input type="number" min="1" name="DurationMinutes" value={form.DurationMinutes} onChange={handleChange} />
         <label>Enclosure</label>
         <select name="EnclosureID" value={form.EnclosureID} onChange={handleChange}>
           <option value="">-- pick one --</option>
           {enclosures.map((en) => (
             <option key={en.EnclosureID} value={en.EnclosureID}>{en.Name}</option>
+          ))}
+        </select>
+        <label>Host (optional)</label>
+        <select name="HostEmployeeID" value={form.HostEmployeeID} onChange={handleChange}>
+          <option value="">-- no host --</option>
+          {zookeepers.map((z) => (
+            <option key={z.EmployeeID} value={z.EmployeeID}>{z.FirstName} {z.LastName}</option>
           ))}
         </select>
         <div className="form-buttons">
