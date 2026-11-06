@@ -25,6 +25,30 @@ function readBody(req) {
   });
 }
 
+const SHOP_TYPES = ["Gift", "Food", "Online"];
+
+// only one online store is allowed; returns an error message or null
+async function checkShopType(shopType, currentShopId) {
+  if (!SHOP_TYPES.includes(shopType)) {
+    return "ShopType must be Gift, Food, or Online";
+  }
+
+  const [rows] = await pool.query(
+    "SELECT ShopID, ShopType FROM shop WHERE IsDeleted = 0"
+  );
+
+  const onlineStore = rows.find((s) => s.ShopType === "Online");
+  const current = rows.find((s) => String(s.ShopID) === String(currentShopId));
+
+  if (shopType === "Online" && onlineStore && String(onlineStore.ShopID) !== String(currentShopId)) {
+    return "There is already an online store";
+  }
+  if (current && current.ShopType === "Online" && shopType !== "Online") {
+    return "The online store's type can't be changed";
+  }
+  return null;
+}
+
 async function handleShops(req, res, pathname) {
   // /api/shops or /api/shops/1
   const parts = pathname.split("/").filter(Boolean);
@@ -72,6 +96,11 @@ async function handleShops(req, res, pathname) {
         return sendJson(res, 400, { error: "Missing required fields" });
       }
 
+      const typeError = await checkShopType(ShopType, null);
+      if (typeError) {
+        return sendJson(res, 400, { error: typeError });
+      }
+
       const [result] = await pool.query(
         "INSERT INTO shop (Name, Location, ShopType) VALUES (?, ?, ?)",
         [Name, Location, ShopType]
@@ -89,6 +118,15 @@ async function handleShops(req, res, pathname) {
     try {
       const body = await readBody(req);
       const { Name, Location, ShopType } = body;
+
+      if (!Name || !Location || !ShopType) {
+        return sendJson(res, 400, { error: "Missing required fields" });
+      }
+
+      const typeError = await checkShopType(ShopType, id);
+      if (typeError) {
+        return sendJson(res, 400, { error: typeError });
+      }
 
       const [result] = await pool.query(
         `UPDATE shop
@@ -108,9 +146,17 @@ async function handleShops(req, res, pathname) {
     }
   }
 
-  // DELETE /api/shops/:id  (soft delete + cascade products)
+  // DELETE /api/shops/:id  (soft delete + cascade products; past sales stay in reports)
   if (req.method === "DELETE" && id) {
     try {
+      const [shopRows] = await pool.query(
+        "SELECT ShopType FROM shop WHERE ShopID = ? AND IsDeleted = 0",
+        [id]
+      );
+      if (shopRows.length > 0 && shopRows[0].ShopType === "Online") {
+        return sendJson(res, 400, { error: "The online store can't be deleted" });
+      }
+
       const [result] = await pool.query(
         "UPDATE shop SET IsDeleted = 1 WHERE ShopID = ? AND IsDeleted = 0",
         [id]

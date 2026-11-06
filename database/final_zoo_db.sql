@@ -6,6 +6,7 @@ USE `final_zoo_db`;
 -- ------------------------------------------------------
 -- Server version	8.0.46
 -- Final schema: multi-ticket qty, PaymentType, IsSick, alerts, transaction_enclosure, soft delete
+-- Online vs in-person sales: transaction has CustomerID (online) OR EmployeeID (in person), always a ShopID
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -62,11 +63,17 @@ CREATE TABLE `attraction` (
   `Name` varchar(100) NOT NULL,
   `Type` varchar(50) NOT NULL,
   `Schedule` datetime NOT NULL,
+  `DurationMinutes` int DEFAULT NULL,
   `EnclosureID` int NOT NULL,
+  `HostEmployeeID` int DEFAULT NULL,
   `IsDeleted` tinyint NOT NULL DEFAULT 0,
   PRIMARY KEY (`AttractionID`),
   KEY `EnclosureID` (`EnclosureID`),
+  KEY `HostEmployeeID` (`HostEmployeeID`),
   CONSTRAINT `attraction_ibfk_1` FOREIGN KEY (`EnclosureID`) REFERENCES `enclosure` (`EnclosureID`),
+  -- zookeeper who hosts the talk/show (optional)
+  CONSTRAINT `attraction_ibfk_2` FOREIGN KEY (`HostEmployeeID`) REFERENCES `employee` (`EmployeeID`),
+  CONSTRAINT `attraction_chk_duration` CHECK ((`DurationMinutes` IS NULL OR `DurationMinutes` > 0)),
   CONSTRAINT `attraction_chk_deleted` CHECK ((`IsDeleted` IN (0,1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -225,7 +232,8 @@ CREATE TABLE `shop` (
   `ShopType` varchar(20) NOT NULL,
   `IsDeleted` tinyint NOT NULL DEFAULT 0,
   PRIMARY KEY (`ShopID`),
-  CONSTRAINT `shop_chk_1` CHECK ((`ShopType` IN ('Gift','Food'))),
+  -- Online = the online store (its own stock, like a warehouse)
+  CONSTRAINT `shop_chk_1` CHECK ((`ShopType` IN ('Gift','Food','Online'))),
   CONSTRAINT `shop_chk_deleted` CHECK ((`IsDeleted` IN (0,1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -317,14 +325,32 @@ UNLOCK TABLES;
 DROP TABLE IF EXISTS `transaction`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
+-- Two kinds of sale share this table:
+--   Online:    CustomerID set, EmployeeID NULL, ShopID = the online store, Card only
+--   In person: EmployeeID (cashier) set, CustomerID NULL, ShopID = gift shop / food stand
 CREATE TABLE `transaction` (
   `TransactionID` int NOT NULL AUTO_INCREMENT,
-  `CustomerID` int NOT NULL,
+  `CustomerID` int DEFAULT NULL,
+  `EmployeeID` int DEFAULT NULL,
+  `ShopID` int NOT NULL,
   `Date` datetime NOT NULL,
   `PaymentType` varchar(50) NOT NULL,
   PRIMARY KEY (`TransactionID`),
   KEY `CustomerID` (`CustomerID`),
-  CONSTRAINT `transaction_ibfk_1` FOREIGN KEY (`CustomerID`) REFERENCES `customer` (`CustomerID`)
+  KEY `EmployeeID` (`EmployeeID`),
+  KEY `ShopID` (`ShopID`),
+  CONSTRAINT `transaction_ibfk_1` FOREIGN KEY (`CustomerID`) REFERENCES `customer` (`CustomerID`),
+  CONSTRAINT `transaction_ibfk_2` FOREIGN KEY (`EmployeeID`) REFERENCES `employee` (`EmployeeID`),
+  CONSTRAINT `transaction_ibfk_3` FOREIGN KEY (`ShopID`) REFERENCES `shop` (`ShopID`),
+  CONSTRAINT `transaction_chk_payment` CHECK ((`PaymentType` IN ('Cash','Card'))),
+  -- exactly one of customer (online) or cashier (in person)
+  CONSTRAINT `transaction_chk_kind` CHECK (
+    (`CustomerID` IS NOT NULL AND `EmployeeID` IS NULL)
+    OR
+    (`CustomerID` IS NULL AND `EmployeeID` IS NOT NULL)
+  ),
+  -- online sales are card only
+  CONSTRAINT `transaction_chk_online_card` CHECK ((`CustomerID` IS NULL OR `PaymentType` = 'Card'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

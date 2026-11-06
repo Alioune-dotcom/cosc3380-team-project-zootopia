@@ -66,12 +66,28 @@ async function handleProducts(req, res, pathname) {
     }
   }
 
-  // GET /api/products
+  // GET /api/products  (optional ?shopId=2 or ?shopType=Online)
   if (req.method === "GET" && !id) {
     try {
-      const [rows] = await pool.query(
-        "SELECT * FROM product WHERE IsDeleted = 0"
-      );
+      let sql = `SELECT p.*, s.Name AS ShopName, s.ShopType
+                 FROM product p
+                 JOIN shop s ON s.ShopID = p.ShopID
+                 WHERE p.IsDeleted = 0 AND s.IsDeleted = 0`;
+      const params = [];
+
+      const shopId = url.searchParams.get("shopId");
+      const shopType = url.searchParams.get("shopType");
+      if (shopId) {
+        sql += " AND p.ShopID = ?";
+        params.push(shopId);
+      }
+      if (shopType) {
+        sql += " AND s.ShopType = ?";
+        params.push(shopType);
+      }
+
+      sql += " ORDER BY p.Name";
+      const [rows] = await pool.query(sql, params);
       return sendJson(res, 200, rows);
     } catch (error) {
       console.error(error.message);

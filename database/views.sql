@@ -14,10 +14,14 @@ DROP VIEW IF EXISTS v_revenue_summary;
 DROP VIEW IF EXISTS v_sick_animals;
 
 -- Total for each sale: tickets (qty * price) + products
+-- Channel: Online if a customer is set, otherwise In person (cashier sale)
 CREATE VIEW v_transaction_totals AS
 SELECT
   t.TransactionID,
   t.CustomerID,
+  t.EmployeeID,
+  t.ShopID,
+  CASE WHEN t.CustomerID IS NOT NULL THEN 'Online' ELSE 'In person' END AS Channel,
   t.Date,
   t.PaymentType,
   COALESCE((

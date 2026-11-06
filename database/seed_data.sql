@@ -56,17 +56,13 @@ INSERT INTO animal (AnimalID, Name, SpeciesID, EnclosureID, Sex, DateOfBirth, Ac
 (8, 'Stripe', 5, 5, 'Male', '2019-04-22', '2020-05-01', 0),
 (9, 'Zigzag', 5, 5, 'Female', '2020-07-07', '2021-02-14', 0);
 
-INSERT INTO attraction (AttractionID, Name, Type, Schedule, EnclosureID) VALUES
-(1, 'Lion Talk', 'Talk', '2026-11-05 13:00:00', 1),
-(2, 'Penguin Feeding', 'Show', '2026-11-05 11:00:00', 3),
-(3, 'Elephant Bath', 'Show', '2026-11-06 15:00:00', 2),
-(4, 'Giraffe Feeding', 'Talk', '2026-11-06 10:30:00', 4);
-
 INSERT INTO shop (ShopID, Name, Location, ShopType) VALUES
 (1, 'Gift Shop', 'Main Plaza', 'Gift'),
 (2, 'Snack Stand', 'Zone A', 'Food'),
-(3, 'Safari Cafe', 'Zone B', 'Food');
+(3, 'Safari Cafe', 'Zone B', 'Food'),
+(4, 'Zootopia Online Store', 'Online', 'Online');
 
+-- products 1-7 are sold in person; 8-11 are the online store's own stock
 INSERT INTO product (ProductID, Name, Price, Category, QuantityInStock, ShopID) VALUES
 (1, 'Plush Lion', 18.99, 'Merchandise', 12, 1),
 (2, 'Zoo Shirt', 24.99, 'Apparel', 8, 1),
@@ -74,7 +70,11 @@ INSERT INTO product (ProductID, Name, Price, Category, QuantityInStock, ShopID) 
 (4, 'Water Bottle', 12.00, 'Merchandise', 15, 1),
 (5, 'Ice Cream', 5.50, 'Food', 20, 2),
 (6, 'Safari Cap', 16.99, 'Apparel', 3, 1),
-(7, 'Burger Combo', 11.99, 'Food', 18, 3);
+(7, 'Burger Combo', 11.99, 'Food', 18, 3),
+(8, 'Plush Lion', 18.99, 'Merchandise', 30, 4),
+(9, 'Zoo Shirt', 24.99, 'Apparel', 25, 4),
+(10, 'Water Bottle', 12.00, 'Merchandise', 40, 4),
+(11, 'Safari Cap', 16.99, 'Apparel', 20, 4);
 
 INSERT INTO customer (CustomerID, Email) VALUES
 (1, 'ava@email.com'),
@@ -88,6 +88,15 @@ INSERT INTO employee (EmployeeID, FirstName, LastName, HireDate, PhoneNumber, Em
 (3, 'Quinn', 'Baker', '2022-05-01', '713-555-1003', 'quinn@zoo.com', 38000.00, 1, NULL),
 (4, 'Jamie', 'Lee', '2021-09-01', '713-555-1004', 'jamie@zoo.com', 42000.00, 1, 3),
 (5, 'Casey', 'Nguyen', '2023-01-15', '713-555-1005', 'casey@zoo.com', 36000.00, 1, NULL);
+
+-- free scheduled events included with admission; host = zookeeper (optional)
+INSERT INTO attraction (AttractionID, Name, Type, Schedule, DurationMinutes, EnclosureID, HostEmployeeID) VALUES
+(1, 'Lion Talk', 'Talk', '2026-11-05 13:00:00', 30, 1, 2),
+(2, 'Penguin Feeding', 'Show', '2026-11-05 11:00:00', 20, 3, 4),
+(3, 'Elephant Bath', 'Show', '2026-11-06 15:00:00', 45, 2, NULL),
+(4, 'Giraffe Feeding', 'Talk', '2026-11-06 10:30:00', 30, 4, NULL),
+(5, 'Penguin Parade', 'Show', '2026-11-07 14:00:00', 15, 3, 4),
+(6, 'Big Cat Keeper Chat', 'Talk', '2026-11-08 11:30:00', 25, 1, 2);
 
 INSERT INTO employee_shop (EmployeeID, ShopID) VALUES
 (3, 1),
@@ -106,13 +115,24 @@ INSERT INTO users (UserID, Username, Password, Role, EmployeeID, CustomerID) VAL
 (8, 'sam', 'pass123', 'Customer', NULL, 3),
 (9, 'riley', 'pass123', 'Customer', NULL, 4);
 
-INSERT INTO `transaction` (TransactionID, CustomerID, Date, PaymentType) VALUES
-(1, 1, '2026-10-20 10:15:00', 'Card'),
-(2, 2, '2026-10-21 11:05:00', 'Cash'),
-(3, 3, '2026-10-22 14:20:00', 'Card'),
-(4, 1, '2026-10-25 09:40:00', 'Card'),
-(5, 4, '2026-10-28 16:10:00', 'Cash');
+-- Online sales (1-7): customer set, no cashier, online store (ShopID 4), card only
+-- In-person sales (8-13): cashier set, no customer, physical shop
+INSERT INTO `transaction` (TransactionID, CustomerID, EmployeeID, ShopID, Date, PaymentType) VALUES
+(1, 1, NULL, 4, '2026-10-20 10:15:00', 'Card'),
+(2, 2, NULL, 4, '2026-10-21 11:05:00', 'Card'),
+(3, 3, NULL, 4, '2026-10-22 14:20:00', 'Card'),
+(4, 1, NULL, 4, '2026-10-25 09:40:00', 'Card'),
+(5, 4, NULL, 4, '2026-10-28 16:10:00', 'Card'),
+(6, 1, NULL, 4, '2026-10-26 19:30:00', 'Card'),
+(7, 3, NULL, 4, '2026-10-29 20:05:00', 'Card'),
+(8, NULL, 3, 1, '2026-10-20 12:30:00', 'Cash'),
+(9, NULL, 3, 2, '2026-10-21 13:10:00', 'Cash'),
+(10, NULL, 5, 3, '2026-10-22 12:45:00', 'Card'),
+(11, NULL, 5, 1, '2026-10-25 15:00:00', 'Card'),
+(12, NULL, 3, 2, '2026-10-28 11:20:00', 'Card'),
+(13, NULL, 5, 3, '2026-10-28 13:00:00', 'Cash');
 
+-- tickets are online only
 INSERT INTO ticket (TicketID, TransactionID, Type, Quantity, UnitPrice) VALUES
 (1, 1, 'Adult', 2, 29.99),
 (2, 1, 'Child', 1, 19.99),
@@ -124,12 +144,18 @@ INSERT INTO ticket (TicketID, TransactionID, Type, Quantity, UnitPrice) VALUES
 (8, 5, 'Child', 2, 19.99);
 
 INSERT INTO transactionproduct (TransactionID, ProductID, Quantity, UnitPrice) VALUES
-(1, 1, 2, 18.99),
-(2, 3, 1, 4.50),
-(3, 2, 1, 24.99),
-(4, 5, 2, 5.50),
-(5, 4, 1, 12.00),
-(5, 7, 1, 11.99);
+(6, 8, 2, 18.99),
+(7, 9, 1, 24.99),
+(7, 11, 1, 16.99),
+(8, 1, 1, 18.99),
+(8, 4, 1, 12.00),
+(9, 3, 1, 4.50),
+(9, 5, 2, 5.50),
+(10, 7, 2, 11.99),
+(11, 2, 1, 24.99),
+(12, 5, 1, 5.50),
+(12, 3, 2, 4.50),
+(13, 7, 1, 11.99);
 
 INSERT INTO transaction_enclosure (TransactionID, EnclosureID) VALUES
 (1, 1),

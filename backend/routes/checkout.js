@@ -120,33 +120,48 @@ async function insertVisitedEnclosures(connection, transactionId, enclosureIds) 
   }
 }
 
+// the online store is the one shop with ShopType = 'Online'
+async function getOnlineStoreId(connection) {
+  const [rows] = await connection.query(
+    "SELECT ShopID FROM shop WHERE ShopType = 'Online' AND IsDeleted = 0 ORDER BY ShopID LIMIT 1"
+  );
+  if (rows.length === 0) {
+    const err = new Error("Online store is not set up");
+    err.statusCode = 500;
+    throw err;
+  }
+  return rows[0].ShopID;
+}
+
+async function rollbackQuietly(connection) {
+  if (!connection) return;
+  try {
+    await connection.rollback();
+    connection.release();
+  } catch (rollbackError) {
+    console.error(rollbackError.message);
+  }
+}
+
 async function handleCheckout(req, res, pathname) {
-  // POST /api/checkout — tickets required, products + visits optional
+  // POST /api/checkout — ONLINE purchase by a logged-in customer
+  // tickets and/or online-store products (at least one), card only
   if (req.method === "POST" && pathname === "/api/checkout") {
     let connection;
 
     try {
       const body = await readBody(req);
-      const { customerId, paymentType } = body;
+      const { customerId } = body;
       const productList = Array.isArray(body.products) ? body.products : [];
       const enclosureIds = Array.isArray(body.enclosureIds) ? body.enclosureIds : [];
+      const tickets = Array.isArray(body.tickets) ? body.tickets : [];
 
-      // support multi-ticket lines, or legacy single ticketType
-      let tickets = Array.isArray(body.tickets) ? body.tickets : [];
-      if (tickets.length === 0 && body.ticketType) {
-        tickets = [{ type: body.ticketType, quantity: body.ticketQuantity || 1 }];
+      if (!customerId) {
+        return sendJson(res, 400, { error: "Missing customerId" });
       }
 
-      if (!customerId || !paymentType) {
-        return sendJson(res, 400, { error: "Missing required fields" });
-      }
-
-      if (paymentType !== "Cash" && paymentType !== "Card") {
-        return sendJson(res, 400, { error: "PaymentType must be Cash or Card" });
-      }
-
-      if (tickets.length === 0) {
-        return sendJson(res, 400, { error: "At least one ticket is required" });
+      if (tickets.length === 0 && productList.length === 0) {
+        return sendJson(res, 400, { error: "Add at least one ticket or product" });
       }
 
       connection = await pool.getConnection();
@@ -157,19 +172,23 @@ async function handleCheckout(req, res, pathname) {
         [customerId]
       );
       if (customerRows.length === 0) {
-        await connection.rollback();
-        connection.release();
+        await rollbackQuietly(connection);
         return sendJson(res, 400, { error: "Customer not found" });
       }
 
+      const shopId = await getOnlineStoreId(connection);
+
+      // online = customer set, no cashier, online store, Card
       const [txResult] = await connection.query(
-        `INSERT INTO \`transaction\` (CustomerID, \`Date\`, PaymentType)
-         VALUES (?, NOW(), ?)`,
-        [customerId, paymentType]
+        `INSERT INTO \`transaction\` (CustomerID, EmployeeID, ShopID, \`Date\`, PaymentType)
+         VALUES (?, NULL, ?, NOW(), 'Card')`,
+        [customerId, shopId]
       );
       const transactionId = txResult.insertId;
 
-      const ticketRows = await insertTickets(connection, transactionId, tickets);
+      const ticketRows = tickets.length > 0
+        ? await insertTickets(connection, transactionId, tickets)
+        : [];
 
       if (productList.length > 0) {
         await insertProducts(connection, transactionId, productList);
@@ -185,18 +204,61 @@ async function handleCheckout(req, res, pathname) {
       return sendJson(res, 201, {
         transactionId,
         tickets: ticketRows,
-        paymentType,
+        paymentType: "Card",
         message: "Purchase complete"
       });
     } catch (error) {
-      if (connection) {
-        try {
-          await connection.rollback();
-          connection.release();
-        } catch (rollbackError) {
-          console.error(rollbackError.message);
-        }
+      await rollbackQuietly(connection);
+      console.error(error.message);
+      return sendJson(res, error.statusCode || 400, { error: error.message });
+    }
+  }
+
+  // POST /api/sales — IN-PERSON sale rung up by a cashier at a gift shop / food stand
+  // no customer recorded; products only; Cash or Card
+  if (req.method === "POST" && pathname === "/api/sales") {
+    let connection;
+
+    try {
+      const body = await readBody(req);
+      const { employeeId, shopId, paymentType } = body;
+      const productList = Array.isArray(body.products) ? body.products : [];
+
+      if (!employeeId || !shopId || !paymentType) {
+        return sendJson(res, 400, { error: "Missing cashier, shop, or payment type" });
       }
+
+      if (paymentType !== "Cash" && paymentType !== "Card") {
+        return sendJson(res, 400, { error: "PaymentType must be Cash or Card" });
+      }
+
+      if (productList.length === 0) {
+        return sendJson(res, 400, { error: "Add at least one product" });
+      }
+
+      connection = await pool.getConnection();
+      await connection.beginTransaction();
+
+      // shop + cashier rules are checked by trg_transaction_shop_rules
+      const [txResult] = await connection.query(
+        `INSERT INTO \`transaction\` (CustomerID, EmployeeID, ShopID, \`Date\`, PaymentType)
+         VALUES (NULL, ?, ?, NOW(), ?)`,
+        [employeeId, shopId, paymentType]
+      );
+      const transactionId = txResult.insertId;
+
+      await insertProducts(connection, transactionId, productList);
+
+      await connection.commit();
+      connection.release();
+
+      return sendJson(res, 201, {
+        transactionId,
+        paymentType,
+        message: "Sale recorded"
+      });
+    } catch (error) {
+      await rollbackQuietly(connection);
       console.error(error.message);
       return sendJson(res, error.statusCode || 400, { error: error.message });
     }
