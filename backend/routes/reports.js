@@ -166,6 +166,7 @@ async function handleReports(req, res, pathname) {
         LEFT JOIN \`transaction\` t
           ON t.TransactionID = te.TransactionID
         WHERE e.IsDeleted = 0
+        AND e.EnclosureID <> 6
       `;
       const params = [];
 

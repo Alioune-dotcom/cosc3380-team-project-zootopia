@@ -57,45 +57,31 @@ export function ReportsHub() {
   const cards = [
     {
       to: '/reports/revenue',
-      title: 'Revenue',
-      blurb: 'Daily gate + shop income by Cash vs Card — filter any date range.',
+      title: 'Revenue Reports',
+      blurb: 'View ticket revenue, payment methods, and gift shop and food sales.',
     },
     {
-      to: '/reports/most-visited',
-      title: 'Most visited habitats',
-      blurb: 'Which enclosures guests actually visit — plan staffing & signage.',
+      to: '/reports/customers',
+      title: 'Customer Reports',
+      blurb: 'Analyze customer spending and purchasing activity.',
     },
     {
-      to: '/reports/occupancy',
-      title: 'Enclosure occupancy',
-      blurb: 'Capacity pressure — spot habitats that are full or underused.',
-    },
-    {
-      to: '/reports/closures',
-      title: 'Closures impact',
-      blurb: 'Full-zoo vs enclosure closures — weather and maintenance history.',
-    },
-    {
-      to: '/reports/sales',
-      title: 'Gift shop & food sales',
-      blurb: 'Top-selling merchandise and snacks by units and revenue.',
-    },
-    {
-      to: '/reports/spending',
-      title: 'Guest spending',
-      blurb: 'Lifetime value per customer — who comes back and spends more.',
+      to: '/reports/operations',
+      title: 'Operations Reports',
+      blurb: 'Monitor enclosure occupancy, visitor traffic, and zoo closures.',
     },
   ]
 
   return (
     <div>
       <div className="page-card">
-        <h2 style={{ marginTop: 0 }}>Operations reports</h2>
+        <h2 style={{ marginTop: 0 }}>Zoo Reports</h2>
         <p style={{ color: 'var(--muted)', marginBottom: 0 }}>
-          Built for a park manager: revenue mix, crowd flow, capacity, and closures —
-          not just raw SQL dumps. Open a report, set dates, and read the insight strip.
+          Select a report category to view financial, customer, and
+          operational information.
         </p>
       </div>
+
       <div className="report-grid">
         {cards.map((c) => (
           <Link key={c.to} to={c.to} className="report-tile">
@@ -104,6 +90,39 @@ export function ReportsHub() {
           </Link>
         ))}
       </div>
+    </div>
+  )
+}
+
+function ReportCategory({ title, description, options }) {
+  const [selectedReport, setSelectedReport] = useState(options[0].value)
+
+  const SelectedComponent = options.find(
+    (option) => option.value === selectedReport
+  ).component
+
+  return (
+    <div>
+      <div className="page-card">
+        <h2 style={{ marginTop: 0 }}>{title}</h2>
+        <p style={{ color: 'var(--muted)' }}>{description}</p>
+
+        <label>
+          Select report
+          <select
+            value={selectedReport}
+            onChange={(e) => setSelectedReport(e.target.value)}
+          >
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <SelectedComponent />
     </div>
   )
 }
@@ -383,5 +402,68 @@ export function MostVisitedReport() {
         })}
       />
     </div>
+  )
+}
+
+export function RevenueReports() {
+  return (
+    <ReportCategory
+      title="Revenue Reports"
+      description="Review ticket income, payment methods, and product sales."
+      options={[
+        {
+          value: 'revenue',
+          label: 'Revenue',
+          component: RevenueReport,
+        },
+        {
+          value: 'sales',
+          label: 'Gift Shop & Food Sales',
+          component: ProductSalesReport,
+        },
+      ]}
+    />
+  )
+}
+
+export function CustomerReports() {
+  return (
+    <ReportCategory
+      title="Customer Reports"
+      description="Review customer spending and purchasing activity."
+      options={[
+        {
+          value: 'spending',
+          label: 'Guest Spending',
+          component: CustomerSpendingReport,
+        },
+      ]}
+    />
+  )
+}
+
+export function OperationsReports() {
+  return (
+    <ReportCategory
+      title="Operations Reports"
+      description="Monitor animal habitats, visitor traffic, and zoo closures."
+      options={[
+        {
+          value: 'occupancy',
+          label: 'Enclosure Occupancy',
+          component: OccupancyReport,
+        },
+        {
+          value: 'most-visited',
+          label: 'Most Visited Habitats',
+          component: MostVisitedReport,
+        },
+        {
+          value: 'closures',
+          label: 'Closures Impact',
+          component: ClosuresReport,
+        },
+      ]}
+    />
   )
 }

@@ -10,12 +10,9 @@ import './App.css'
 import Animals from './pages/Animals.jsx'
 import {
   ReportsHub,
-  OccupancyReport,
-  ProductSalesReport,
-  CustomerSpendingReport,
-  RevenueReport,
-  ClosuresReport,
-  MostVisitedReport,
+  RevenueReports,
+  CustomerReports,
+  OperationsReports,
 } from './pages/Reports.jsx'
 import Products from './pages/Products.jsx'
 import Species from './pages/Species.jsx'
@@ -60,12 +57,9 @@ function App() {
         <Route path="/products" element={<Products />} />
         <Route path="/new-sale" element={<NewSale />} />
         <Route path="/reports" element={<ReportsHub />} />
-        <Route path="/reports/occupancy" element={<OccupancyReport />} />
-        <Route path="/reports/sales" element={<ProductSalesReport />} />
-        <Route path="/reports/spending" element={<CustomerSpendingReport />} />
-        <Route path="/reports/revenue" element={<RevenueReport />} />
-        <Route path="/reports/closures" element={<ClosuresReport />} />
-        <Route path="/reports/most-visited" element={<MostVisitedReport />} />
+        <Route path="/reports/revenue" element={<RevenueReports />} />
+        <Route path="/reports/customers" element={<CustomerReports />} />
+        <Route path="/reports/operations" element={<OperationsReports />} />
         <Route path="*" element={<ComingSoon />} />
       </Route>
     </Routes>
