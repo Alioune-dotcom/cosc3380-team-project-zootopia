@@ -152,16 +152,18 @@ function TransactionList({ customer }) {
       {orders.length === 0 && !error ? (
         <div className="page-card">
           <p>No purchases yet.</p>
-          <Link className="btn gold" to="/checkout">Buy tickets</Link>{' '}
-          <Link className="btn" to="/shop">Visit the online shop</Link>
+<div className="form-buttons">
+  <Link className="btn gold" to="/checkout">Buy tickets</Link>
+  <Link className="btn secondary" to="/shop">Visit the online shop</Link>
+</div>
         </div>
       ) : (
         <table className="data-table">
           <thead>
             <tr>
               <th>Date</th>
-              <th>Tickets</th>
-              <th>Shop items</th>
+<th>Tickets</th>
+<th>Shop items</th>
               <th>Payment</th>
               <th>Total</th>
               <th>Details</th>
@@ -171,13 +173,13 @@ function TransactionList({ customer }) {
             {orders.map((order) => (
               <tr key={order.transactionId}>
                 <td>{String(order.date).slice(0, 10)}</td>
-                <td><strong>{order.ticketCount}</strong></td>
-                <td><strong>{order.itemCount}</strong></td>
+<td><strong>{order.ticketCount}</strong></td>
+<td><strong>{order.productCount}</strong></td>
                 <td>{order.paymentType}</td>
                 <td>${Number(order.totalAmount).toFixed(2)}</td>
                 <td>
                   <Link to={'/my-transactions/' + order.transactionId}>
-                    View details
+                    View receipt
                   </Link>
                 </td>
               </tr>

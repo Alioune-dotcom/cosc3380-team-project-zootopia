@@ -117,7 +117,7 @@ async function handleTransactions(req, res, pathname) {
              SELECT COALESCE(SUM(tp.Quantity), 0)
              FROM transactionproduct tp
              WHERE tp.TransactionID = t.TransactionID
-           ) AS ItemCount
+           ) AS ProductCount
          FROM \`transaction\` t
          LEFT JOIN v_transaction_totals vt
            ON vt.TransactionID = t.TransactionID
@@ -132,7 +132,7 @@ async function handleTransactions(req, res, pathname) {
         date: row.Date,
         paymentType: row.PaymentType,
         ticketCount: row.TicketCount,
-        itemCount: row.ItemCount,
+        productCount: row.ProductCount,
         totalAmount: row.TotalAmount
       }));
 

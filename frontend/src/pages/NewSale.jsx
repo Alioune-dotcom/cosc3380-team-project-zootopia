@@ -68,10 +68,10 @@ function NewSale() {
       setMessage({ type: 'error', text: 'Pick a shop' })
       return
     }
-    if (selectedProducts.length === 0) {
-      setMessage({ type: 'error', text: 'Add at least one product' })
-      return
-    }
+if (selectedProducts.length === 0) {
+  setMessage({ type: 'error', text: 'Add at least one product' })
+  return
+}
 
     try {
       const response = await fetch('/api/sales', {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isPublicEnclosure } from '../zooInfo.js'
+import { isPublicEnclosure, isAnimalUnavailable, UNAVAILABLE_MESSAGE } from '../zooInfo.js'
 
 const ANIMAL_PHOTOS = {
   Lion: '/images/lion.jpg',
@@ -42,13 +42,30 @@ function CustomerEnclosures() {
     load()
   }, [])
 
+  // sick / quarantined animals are listed in their own panel, not on habitat cards
+  const away = animals.filter(isAnimalUnavailable)
+
   function animalsInEnclosure(enclosureName) {
-    // guests only see healthy animals on exhibit (sick are quarantined)
-    return animals.filter((a) => a.Enclosure === enclosureName && !a.IsSick)
+    return animals.filter((a) => a.Enclosure === enclosureName && !isAnimalUnavailable(a))
+  }
+
+  function restingFrom(enclosureId) {
+    return animals.filter((a) => isAnimalUnavailable(a) && a.HomeEnclosureID === enclosureId)
   }
 
   return (
     <div>
+      {away.length > 0 && (
+        <div className="page-card" style={{ borderLeft: '4px solid #b45309', marginBottom: 16 }}>
+          <h3 style={{ marginTop: 0 }}>Not on display today</h3>
+          <p>{UNAVAILABLE_MESSAGE}</p>
+          <ul>
+            {away.map((a) => (
+              <li key={a.AnimalID}>{a.AnimalName} ({a.Species})</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <h1>Enclosures</h1>
       <p style={{ color: 'var(--muted)' }}>Wander the park — tap a habitat to see who’s home.</p>
 
@@ -59,6 +76,7 @@ function CustomerEnclosures() {
       <div className="report-grid">
         {enclosures.filter(isPublicEnclosure).map((enc) => {
           const residents = animalsInEnclosure(enc.Name)
+          const resting = restingFrom(enc.EnclosureID)
           const coverSpecies = residents[0]?.Species
           return (
             <article key={enc.EnclosureID} className="report-tile" style={{ padding: 0, overflow: 'hidden' }}>
@@ -82,6 +100,11 @@ function CustomerEnclosures() {
                       </li>
                     ))}
                   </ul>
+                )}
+                {resting.length > 0 && (
+                  <p style={{ margin: '10px 0 0', color: '#b45309' }}>
+                    {resting.map((a) => a.AnimalName).join(', ')} not on display today. Come back and visit again soon!
+                  </p>
                 )}
               </div>
             </article>

@@ -135,17 +135,20 @@ async function getOnlineStoreId(connection) {
 
 async function rollbackQuietly(connection) {
   if (!connection) return;
+
   try {
     await connection.rollback();
-    connection.release();
   } catch (rollbackError) {
     console.error(rollbackError.message);
+  } finally {
+    connection.release();
   }
 }
 
 async function handleCheckout(req, res, pathname) {
   // POST /api/checkout — ONLINE purchase by a logged-in customer
   // tickets and/or online-store products (at least one), card only
+  // enclosure visits require at least one ticket
   if (req.method === "POST" && pathname === "/api/checkout") {
     let connection;
 
@@ -161,7 +164,15 @@ async function handleCheckout(req, res, pathname) {
       }
 
       if (tickets.length === 0 && productList.length === 0) {
-        return sendJson(res, 400, { error: "Add at least one ticket or product" });
+        return sendJson(res, 400, {
+          error: "Add at least one ticket or product"
+        });
+      }
+
+      if (tickets.length === 0 && enclosureIds.length > 0) {
+        return sendJson(res, 400, {
+          error: "Visiting enclosures requires a ticket"
+        });
       }
 
       connection = await pool.getConnection();
@@ -184,6 +195,7 @@ async function handleCheckout(req, res, pathname) {
          VALUES (?, NULL, ?, NOW(), 'Card')`,
         [customerId, shopId]
       );
+
       const transactionId = txResult.insertId;
 
       const ticketRows = tickets.length > 0

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { getLoggedInCustomer } from '../customerAuth.js'
 import { TICKETS, isPublicEnclosure } from '../zooInfo.js'
 
-// online ticket checkout (gift shop items are on the separate Online Shop page)
+// Online ticket checkout. Merchandise is purchased separately in the Online Shop.
 const STEPS = ['Tickets', 'Visits', 'Pay']
 
 function Checkout() {
@@ -57,14 +57,14 @@ function Checkout() {
   }
 
   function nextStep() {
-    setMessage('')
-    if (step === 1 && ticketLines.length === 0) {
-      setMessage('Add at least one ticket (any mix of Adult, Child, Senior)')
-      return
-    }
-    if (step === STEPS.length) return
-    setStep(step + 1)
+  setMessage('')
+  if (step === 1 && ticketLines.length === 0) {
+    setMessage('Add at least one ticket (any mix of Adult, Child, Senior)')
+    return
   }
+  if (step === STEPS.length) return
+  setStep(step + 1)
+}
 
   async function handleBuy(e) {
     e.preventDefault()
@@ -76,14 +76,17 @@ function Checkout() {
     }
     try {
       const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId: customer.customerId,
-          tickets: ticketLines.map((t) => ({ type: t.type, quantity: t.quantity })),
-          enclosureIds: selectedEnclosures,
-        }),
-      })
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    customerId: customer.customerId,
+    tickets: ticketLines.map((t) => ({
+      type: t.type,
+      quantity: t.quantity,
+    })),
+    enclosureIds: selectedEnclosures,
+  }),
+})
       const data = await response.json()
 
       if (!response.ok) {
@@ -99,8 +102,11 @@ function Checkout() {
 
   return (
     <div>
-      <h1>Buy Tickets</h1>
-      <p>Choose your tickets, tell us which habitats you plan to visit, then pay by card.</p>
+<h1>Buy Tickets</h1>
+<p>
+  Choose your tickets, tell us which habitats you plan to visit,
+  then pay by card.
+</p>
 
       <div className="wizard-steps">
         {STEPS.map((label, i) => {
