@@ -170,12 +170,7 @@ function Dashboard() {
             <span>Low-stock items</span>
           </div>
         )}
-        {isManager && (
-          <div className="stat-box">
-            <strong>${stats.revenueHint.toFixed(0)}</strong>
-            <span>Tracked revenue</span>
-          </div>
-        )}
+        
       </div>
 
       <div className="report-grid" style={{ marginTop: 8 }}>
