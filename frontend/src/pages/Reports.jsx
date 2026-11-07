@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import ReportPage from '../components/ReportPage.jsx'
 
@@ -23,7 +23,6 @@ function FilterBar({ filters, setFilters, children }) {
       </label>
       {children}
       <span style={{ fontSize: 13, color: 'var(--muted)', alignSelf: 'center' }}>
-        Filters are optional — click Generate report below when ready.
       </span>
     </div>
   )
@@ -53,21 +52,22 @@ function toBars(items, valueKey, labelKey) {
   }))
 }
 
+
 export function ReportsHub() {
   const cards = [
     {
       to: '/reports/revenue',
-      title: 'Revenue Reports',
-      blurb: 'View ticket revenue, payment methods, and gift shop and food sales.',
+      title: 'Revenue Overview',
+      blurb: 'View ticket revenue, payment methods, and sales totals.',
     },
     {
-      to: '/reports/customers',
-      title: 'Customer Reports',
-      blurb: 'Analyze customer spending and purchasing activity.',
+      to: '/reports/animals',
+      title: 'Animal Population',
+      blurb: 'Monitor animal counts, health, species, and enclosures.',
     },
     {
       to: '/reports/operations',
-      title: 'Operations Reports',
+      title: 'Zoo Operations',
       blurb: 'Monitor enclosure occupancy, visitor traffic, and zoo closures.',
     },
   ]
@@ -77,16 +77,16 @@ export function ReportsHub() {
       <div className="page-card">
         <h2 style={{ marginTop: 0 }}>Zoo Reports</h2>
         <p style={{ color: 'var(--muted)', marginBottom: 0 }}>
-          Select a report category to view financial, customer, and
-          operational information.
+          Select one of the reports below to view the zoo's financial,
+          animal population, and operational information.
         </p>
       </div>
 
       <div className="report-grid">
-        {cards.map((c) => (
-          <Link key={c.to} to={c.to} className="report-tile">
-            <h3>{c.title}</h3>
-            <p>{c.blurb}</p>
+        {cards.map((card) => (
+          <Link key={card.to} to={card.to} className="report-tile">
+            <h3>{card.title}</h3>
+            <p>{card.blurb}</p>
           </Link>
         ))}
       </div>
@@ -94,45 +94,149 @@ export function ReportsHub() {
   )
 }
 
-function ReportCategory({ title, description, options }) {
-  const [selectedReport, setSelectedReport] = useState(options[0].value)
 
-  const SelectedComponent = options.find(
-    (option) => option.value === selectedReport
-  ).component
+export function AnimalPopulationReport() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [hasGenerated, setHasGenerated] = useState(false)
+
+  async function generateReport() {
+    setLoading(true)
+    setError('')
+    setHasGenerated(true)
+
+    try {
+      const response = await fetch('/api/reports/animal-population')
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not generate report')
+      }
+
+      setData(result)
+    } catch (err) {
+      setError(err.message || 'Could not connect to the server')
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const summary = data?.summary
 
   return (
     <div>
       <div className="page-card">
-        <h2 style={{ marginTop: 0 }}>{title}</h2>
-        <p style={{ color: 'var(--muted)' }}>{description}</p>
-
-        <label>
-          Select report
-          <select
-            value={selectedReport}
-            onChange={(e) => setSelectedReport(e.target.value)}
-          >
-            {options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <h2 style={{ marginTop: 0 }}>Animal Population</h2>
+        <p style={{ color: 'var(--muted)' }}>
+          View the zoo's active animal population, health counts, species,
+          and enclosure distribution.
+        </p>
+        <p style={{ color: 'var(--muted)', fontSize: 14 }}>
+          Click Generate to load the latest animal population data.
+        </p>
+        <button
+          type="button"
+          className="gold"
+          onClick={generateReport}
+          disabled={loading}
+        >
+          {loading ? 'Generating…' : hasGenerated ? 'Regenerate report' : 'Generate report'}
+        </button>
       </div>
 
-      <SelectedComponent />
+      {error ? <p className="message error">{error}</p> : null}
+
+      {!hasGenerated && !loading ? (
+        <div className="insight">
+          Report not generated yet — click Generate when you are ready.
+        </div>
+      ) : null}
+
+      {data && !loading && !error ? (
+        <>
+          <div className="kpi-row">
+            <div className="stat-box">
+              <strong>{summary?.TotalAnimals ?? 0}</strong>
+              <span>Total animals</span>
+            </div>
+            <div className="stat-box">
+              <strong>{summary?.HealthyAnimals ?? 0}</strong>
+              <span>Healthy animals</span>
+            </div>
+            <div className="stat-box">
+              <strong>{summary?.SickAnimals ?? 0}</strong>
+              <span>Sick animals</span>
+            </div>
+          </div>
+
+          <div className="page-card">
+            <h3 style={{ marginTop: 0 }}>Population by species</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Species</th>
+                  <th>Conservation status</th>
+                  <th>Animal count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.bySpecies.map((row, index) => (
+                  <tr key={row.CommonName + index}>
+                    <td>{row.CommonName}</td>
+                    <td>{row.ConservationStatus || '—'}</td>
+                    <td>{row.AnimalCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="page-card">
+            <h3 style={{ marginTop: 0 }}>Population by enclosure</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Enclosure</th>
+                  <th>Habitat type</th>
+                  <th>Animal count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.byEnclosure.map((row, index) => (
+                  <tr key={row.EnclosureName + index}>
+                    <td>{row.EnclosureName}</td>
+                    <td>{row.HabitatType || '—'}</td>
+                    <td>{row.AnimalCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }
 
 export function OccupancyReport() {
+  const [filters, setFilters] = useState({ enclosureId: '' })
+  const [enclosures, setEnclosures] = useState([])
+
+  useEffect(() => {
+    fetch('/api/enclosures')
+      .then((res) => res.json())
+      .then((data) => setEnclosures(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Could not load enclosures:', err))
+  }, [])
+
   return (
     <ReportPage
       title="Enclosure occupancy"
       description="Live capacity vs animals on exhibit. Use this before adding animals or planning moves."
       url="/api/reports/enclosure-occupancy"
+      filters={filters}
       rowKey="EnclosureID"
       columns={[
         { key: 'EnclosureName', label: 'Enclosure' },
@@ -150,9 +254,7 @@ export function OccupancyReport() {
           { label: 'Avg fill', value: avg.toFixed(0) + '%' },
           { label: 'Tightest', value: fullest.EnclosureName },
           { label: 'Most open', value: emptiest.EnclosureName },
-          {
-            insight: `${fullest.EnclosureName} is ${fullest.CapacityPercentage}% full.`,
-          },
+          { insight: `${fullest.EnclosureName} is ${fullest.CapacityPercentage}% full.` },
         ]
       }}
       bar={(rows) => ({
@@ -165,16 +267,61 @@ export function OccupancyReport() {
             display: r.CapacityPercentage + '%',
           })),
       })}
-    />
+    >
+      <div className="page-card">
+        <label>
+          Enclosure
+          <select
+            value={filters.enclosureId}
+            onChange={(e) => setFilters({ enclosureId: e.target.value })}
+          >
+            <option value="">All enclosures</option>
+            {enclosures.map((enclosure) => (
+              <option key={enclosure.EnclosureID} value={enclosure.EnclosureID}>
+                {enclosure.Name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </ReportPage>
   )
 }
 
+
+
 export function ProductSalesReport() {
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    shopId: '',
+    productId: '',
+  })
+  const [shops, setShops] = useState([])
+  const [products, setProducts] = useState([])
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/shops').then((res) => res.json()),
+      fetch('/api/products').then((res) => res.json()),
+    ])
+      .then(([shopData, productData]) => {
+        setShops(Array.isArray(shopData) ? shopData : [])
+        setProducts(Array.isArray(productData) ? productData : [])
+      })
+      .catch((err) => console.error('Could not load shop filters:', err))
+  }, [])
+
+  const filteredProducts = filters.shopId
+    ? products.filter((p) => String(p.ShopID) === filters.shopId)
+    : products
+
   return (
     <ReportPage
       title="Gift shop & food sales"
       description="What visitors buy — restock winners, rethink slow movers."
       url="/api/reports/product-sales"
+      filters={filters}
       rowKey="ProductID"
       columns={[
         { key: 'Name', label: 'Product' },
@@ -203,49 +350,63 @@ export function ProductSalesReport() {
           'Name'
         ),
       })}
-    />
-  )
-}
+    >
+      <div className="page-card">
+        <FilterBar filters={filters} setFilters={setFilters}>
+          <label>
+            Shop
+            <select
+              value={filters.shopId}
+              onChange={(e) => setFilters({
+                ...filters,
+                shopId: e.target.value,
+                productId: '',
+              })}
+            >
+              <option value="">All shops</option>
+              {shops.map((shop) => (
+                <option key={shop.ShopID} value={shop.ShopID}>
+                  {shop.Name} ({shop.ShopType})
+                </option>
+              ))}
+            </select>
+          </label>
 
-export function CustomerSpendingReport() {
-  return (
-    <ReportPage
-      title="Guest spending"
-      description="Lifetime spend and visit frequency — useful for memberships and promos."
-      url="/api/reports/customer-spending"
-      rowKey="CustomerID"
-      columns={[
-        { key: 'Email', label: 'Customer' },
-        { key: 'TransactionCount', label: 'Purchases' },
-        { key: 'LifetimeSpend', label: 'Total spent', isMoney: true },
-      ]}
-      summarize={(rows) => {
-        const active = rows.filter((r) => Number(r.TransactionCount) > 0)
-        const spend = active.reduce((s, r) => s + Number(r.LifetimeSpend), 0)
-        const top = [...active].sort((a, b) => Number(b.LifetimeSpend) - Number(a.LifetimeSpend))[0]
-        return [
-          { label: 'Paying guests', value: active.length },
-          { label: 'Total spend', value: money(spend) },
-          { label: 'Top guest', value: top ? top.Email : '—' },
-          top
-            ? { insight: `${top.Email} has spent ${money(top.LifetimeSpend)} across ${top.TransactionCount} visits.` }
-            : {},
-        ]
-      }}
-      bar={(rows) => ({
-        title: 'Highest lifetime spend',
-        items: toBars(
-          [...rows].sort((a, b) => Number(b.LifetimeSpend) - Number(a.LifetimeSpend)).slice(0, 8),
-          'LifetimeSpend',
-          'Email'
-        ),
-      })}
-    />
+          <label>
+            Product
+            <select
+              value={filters.productId}
+              onChange={(e) => setFilters({ ...filters, productId: e.target.value })}
+            >
+              <option value="">All products</option>
+              {filteredProducts.map((product) => (
+                <option key={product.ProductID} value={product.ProductID}>
+                  {product.Name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </FilterBar>
+      </div>
+    </ReportPage>
   )
 }
 
 export function RevenueReport() {
-  const [filters, setFilters] = useState({ startDate: '', endDate: '', paymentType: '' })
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    paymentType: '',
+    customerId: '',
+  })
+  const [customers, setCustomers] = useState([])
+
+  useEffect(() => {
+    fetch('/api/customers')
+      .then((res) => res.json())
+      .then((data) => setCustomers(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Could not load customers:', err))
+  }, [])
 
   return (
     <div>
@@ -254,17 +415,37 @@ export function RevenueReport() {
           Payment
           <select
             value={filters.paymentType}
-            onChange={(e) => setFilters({ ...filters, paymentType: e.target.value })}
+            onChange={(e) =>
+              setFilters({ ...filters, paymentType: e.target.value })
+            }
           >
             <option value="">All</option>
             <option value="Cash">Cash</option>
             <option value="Card">Card</option>
           </select>
         </label>
+
+        <label>
+          Customer
+          <select
+            value={filters.customerId}
+            onChange={(e) =>
+              setFilters({ ...filters, customerId: e.target.value })
+            }
+          >
+            <option value="">All customers</option>
+            {customers.map((customer) => (
+              <option key={customer.CustomerID} value={customer.CustomerID}>
+                {customer.Email}
+              </option>
+            ))}
+          </select>
+        </label>
       </FilterBar>
+
       <ReportPage
         title="Revenue"
-        description="Daily income from tickets + products. Filter by date and Cash vs Card."
+        description="Daily income from tickets + products. Filter by date, payment type, and customer."
         url={buildUrl('/api/reports/revenue', filters)}
         rowKey={(row) => row.SaleDate + '-' + row.PaymentType}
         columns={[
@@ -276,8 +457,13 @@ export function RevenueReport() {
         summarize={(rows) => {
           const total = rows.reduce((s, r) => s + Number(r.Revenue), 0)
           const sales = rows.reduce((s, r) => s + Number(r.SaleCount), 0)
-          const card = rows.filter((r) => r.PaymentType === 'Card').reduce((s, r) => s + Number(r.Revenue), 0)
-          const cash = rows.filter((r) => r.PaymentType === 'Cash').reduce((s, r) => s + Number(r.Revenue), 0)
+          const card = rows
+            .filter((r) => r.PaymentType === 'Card')
+            .reduce((s, r) => s + Number(r.Revenue), 0)
+          const cash = rows
+            .filter((r) => r.PaymentType === 'Cash')
+            .reduce((s, r) => s + Number(r.Revenue), 0)
+
           return [
             { label: 'Total revenue', value: money(total) },
             { label: 'Transactions', value: sales },
@@ -405,20 +591,40 @@ export function MostVisitedReport() {
   )
 }
 
+
+export function ZooOperationsReport() {
+  return (
+    <div>
+      <div className="page-card">
+        <h2 style={{ marginTop: 0 }}>Zoo Operations</h2>
+        <p style={{ color: 'var(--muted)' }}>
+          Monitor enclosure capacity, visitor traffic, and zoo closures.
+          Generate each report separately to view the latest information.
+        </p>
+      </div>
+
+      <OccupancyReport />
+      <MostVisitedReport />
+      <ClosuresReport />
+    </div>
+  )
+}
+
+
 export function RevenueReports() {
   return (
     <ReportCategory
-      title="Revenue Reports"
-      description="Review ticket income, payment methods, and product sales."
+      title="Revenue"
+      description="Analyze zoo income, payment methods, and product performance."
       options={[
         {
           value: 'revenue',
-          label: 'Revenue',
+          label: 'Revenue Overview',
           component: RevenueReport,
         },
         {
           value: 'sales',
-          label: 'Gift Shop & Food Sales',
+          label: 'Product Performance',
           component: ProductSalesReport,
         },
       ]}
@@ -426,21 +632,6 @@ export function RevenueReports() {
   )
 }
 
-export function CustomerReports() {
-  return (
-    <ReportCategory
-      title="Customer Reports"
-      description="Review customer spending and purchasing activity."
-      options={[
-        {
-          value: 'spending',
-          label: 'Guest Spending',
-          component: CustomerSpendingReport,
-        },
-      ]}
-    />
-  )
-}
 
 export function OperationsReports() {
   return (

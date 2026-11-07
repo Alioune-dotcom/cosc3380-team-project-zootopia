@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from 'react'
 import DataTable from './DataTable.jsx'
 
@@ -10,6 +11,8 @@ function ReportPage({
   rowKey,
   summarize,
   bar,
+  filters,
+  children,
 }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
@@ -20,11 +23,22 @@ function ReportPage({
     setLoading(true)
     setError('')
     setHasGenerated(true)
+
     try {
-      const response = await fetch(url)
+      const params = new URLSearchParams()
+
+      Object.entries(filters || {}).forEach(([key, value]) => {
+        if (value) params.set(key, value)
+      })
+
+      const query = params.toString()
+      const reportUrl = query ? `${url}?${query}` : url
+
+      const response = await fetch(reportUrl)
       const data = await response.json()
+
       if (!response.ok) {
-        setError(data.error)
+        setError(data.error || 'Could not generate report')
         setRows([])
       } else {
         setRows(data)
@@ -33,22 +47,39 @@ function ReportPage({
       setError('Could not connect to the server')
       setRows([])
     }
+
     setLoading(false)
   }
 
-  const kpis = useMemo(() => (summarize ? summarize(rows) : []), [rows, summarize])
-  const bars = useMemo(() => (bar ? bar(rows) : null), [rows, bar])
+  const kpis = useMemo(
+    () => (summarize ? summarize(rows) : []),
+    [rows, summarize]
+  )
+
+  const bars = useMemo(
+    () => (bar ? bar(rows) : null),
+    [rows, bar]
+  )
+
   const insight = bars?.insight || kpis.find((k) => k.insight)?.insight
 
   return (
     <div>
+      {children}
+
       <div className="page-card">
         <h2 style={{ marginTop: 0 }}>{title}</h2>
         <p style={{ color: 'var(--muted)' }}>{description}</p>
         <p style={{ color: 'var(--muted)', fontSize: 14 }}>
           Set any filters above (optional), then generate. Nothing loads until you click the button.
         </p>
-        <button type="button" className="gold" onClick={generateReport} disabled={loading}>
+
+        <button
+          type="button"
+          className="gold"
+          onClick={generateReport}
+          disabled={loading}
+        >
           {loading ? 'Generating…' : hasGenerated ? 'Regenerate report' : 'Generate report'}
         </button>
       </div>
@@ -56,7 +87,9 @@ function ReportPage({
       {error ? <p className="message error">{error}</p> : null}
 
       {!hasGenerated && !loading ? (
-        <div className="insight">Report not generated yet — click Generate when you are ready.</div>
+        <div className="insight">
+          Report not generated yet — click Generate when you are ready.
+        </div>
       ) : null}
 
       {hasGenerated && !loading && !error ? (
@@ -82,7 +115,10 @@ function ReportPage({
                   <div key={item.label} className="bar-row">
                     <span>{item.label}</span>
                     <div className="bar-track">
-                      <div className="bar-fill" style={{ width: item.pct + '%' }} />
+                      <div
+                        className="bar-fill"
+                        style={{ width: item.pct + '%' }}
+                      />
                     </div>
                     <strong>{item.display}</strong>
                   </div>

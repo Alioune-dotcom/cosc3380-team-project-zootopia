@@ -11,9 +11,9 @@ import Animals from './pages/Animals.jsx'
 import Shop from './pages/Shop.jsx'
 import {
   ReportsHub,
-  RevenueReports,
-  CustomerReports,
-  OperationsReports,
+  RevenueReport,
+  AnimalPopulationReport,
+  ZooOperationsReport,
 } from './pages/Reports.jsx'
 import Products from './pages/Products.jsx'
 import Species from './pages/Species.jsx'
@@ -63,9 +63,9 @@ function App() {
         <Route path="/products" element={<Products />} />
         <Route path="/new-sale" element={<NewSale />} />
         <Route path="/reports" element={<ReportsHub />} />
-        <Route path="/reports/revenue" element={<RevenueReports />} />
-        <Route path="/reports/customers" element={<CustomerReports />} />
-        <Route path="/reports/operations" element={<OperationsReports />} />
+<Route path="/reports/revenue" element={<RevenueReport />} />
+<Route path="/reports/animals" element={<AnimalPopulationReport />} />
+<Route path="/reports/operations" element={<ZooOperationsReport />} />
         <Route path="*" element={<ComingSoon />} />
       </Route>
     </Routes>
