@@ -13,6 +13,7 @@ function ReportPage({
   bar,
   filters,
   children,
+  insightAsCard = false,
 }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
@@ -71,7 +72,7 @@ function ReportPage({
         <h2 style={{ marginTop: 0 }}>{title}</h2>
         <p style={{ color: 'var(--muted)' }}>{description}</p>
         <p style={{ color: 'var(--muted)', fontSize: 14 }}>
-          Set any filters above (optional), then generate. Nothing loads until you click the button.
+          Set any filters above (optional), then generate. 
         </p>
 
         <button
@@ -94,9 +95,12 @@ function ReportPage({
 
       {hasGenerated && !loading && !error ? (
         <>
-          {insight ? <div className="insight">{insight}</div> : null}
+          {insight && !insightAsCard ? (
+            <div className="insight">{insight}</div>
+          ) : null}
 
-          {kpis.length > 0 ? (
+          {kpis.filter((k) => k.label).length > 0 ||
+          insightAsCard && insight ? (
             <div className="kpi-row">
               {kpis.filter((k) => k.label).map((k) => (
                 <div key={k.label} className="stat-box">
@@ -104,8 +108,14 @@ function ReportPage({
                   <span>{k.label}</span>
                 </div>
               ))}
-            </div>
-          ) : null}
+
+    {insightAsCard && insight ? (
+      <div className="stat-box insight-stat-box">
+        <span>{insight}</span>
+      </div>
+    ) : null}
+  </div>
+) : null}
 
           {bars?.items?.length ? (
             <div className="page-card">

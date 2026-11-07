@@ -398,15 +398,35 @@ export function RevenueReport() {
     endDate: '',
     paymentType: '',
     customerId: '',
+    shopId: '',
+    productName: '',
+    ticketType: '',
   })
+
   const [customers, setCustomers] = useState([])
+  const [products, setProducts] = useState([])
+  const [shops, setShops] = useState([])
 
   useEffect(() => {
     fetch('/api/customers')
       .then((res) => res.json())
       .then((data) => setCustomers(Array.isArray(data) ? data : []))
       .catch((err) => console.error('Could not load customers:', err))
+
+    fetch('/api/products')
+      .then((res) => res.json())
+      .then((data) => setProducts(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Could not load products:', err))
+
+    fetch('/api/shops')
+      .then((res) => res.json())
+      .then((data) => setShops(Array.isArray(data) ? data : []))
+      .catch((err) => console.error('Could not load shops:', err))
   }, [])
+
+  const productNames = [
+    ...new Set(products.map((product) => product.Name)),
+  ].sort((a, b) => a.localeCompare(b))
 
   return (
     <div>
@@ -441,11 +461,60 @@ export function RevenueReport() {
             ))}
           </select>
         </label>
+
+        <label>
+          Shop
+          <select
+            value={filters.shopId}
+            onChange={(e) =>
+              setFilters({ ...filters, shopId: e.target.value })
+            }
+          >
+            <option value="">All shops</option>
+            {shops.map((shop) => (
+              <option key={shop.ShopID} value={shop.ShopID}>
+                {shop.Name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+  Product
+  <select
+    value={filters.productName}
+    onChange={(e) =>
+      setFilters({ ...filters, productName: e.target.value })
+    }
+  >
+    <option value="">All products</option>
+    {productNames.map((name) => (
+      <option key={name} value={name}>
+        {name}
+      </option>
+    ))}
+  </select>
+</label>
+
+        <label>
+          Ticket Type
+          <select
+            value={filters.ticketType}
+            onChange={(e) =>
+              setFilters({ ...filters, ticketType: e.target.value })
+            }
+          >
+            <option value="">All ticket types</option>
+            <option value="Adult">Adult</option>
+            <option value="Child">Child</option>
+            <option value="Senior">Senior</option>
+          </select>
+        </label>
       </FilterBar>
 
       <ReportPage
-        title="Revenue"
-        description="Daily income from tickets + products. Filter by date, payment type, and customer."
+      title="Revenue"
+      insightAsCard
         url={buildUrl('/api/reports/revenue', filters)}
         rowKey={(row) => row.SaleDate + '-' + row.PaymentType}
         columns={[
@@ -482,10 +551,13 @@ export function RevenueReport() {
             const key = String(r.SaleDate).slice(0, 10)
             byDate[key] = (byDate[key] || 0) + Number(r.Revenue)
           })
+
           const items = Object.entries(byDate)
             .sort((a, b) => a[0].localeCompare(b[0]))
             .map(([label, value]) => ({ label, value }))
+
           const max = Math.max(...items.map((i) => i.value), 1)
+
           return {
             title: 'Revenue by day',
             items: items.map((i) => ({
@@ -607,28 +679,6 @@ export function ZooOperationsReport() {
       <MostVisitedReport />
       <ClosuresReport />
     </div>
-  )
-}
-
-
-export function RevenueReports() {
-  return (
-    <ReportCategory
-      title="Revenue"
-      description="Analyze zoo income, payment methods, and product performance."
-      options={[
-        {
-          value: 'revenue',
-          label: 'Revenue Overview',
-          component: RevenueReport,
-        },
-        {
-          value: 'sales',
-          label: 'Product Performance',
-          component: ProductSalesReport,
-        },
-      ]}
-    />
   )
 }
 

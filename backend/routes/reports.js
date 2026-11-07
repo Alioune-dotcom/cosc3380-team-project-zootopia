@@ -150,40 +150,131 @@ async function handleReports(req, res, pathname) {
     }
   }
 
-  // GET /api/reports/revenue?startDate=&endDate=&paymentType=
+    // GET /api/reports/revenue?startDate=&endDate=&paymentType=&customerId=&shopId=&productId=&ticketType=
   if (req.method === "GET" && pathname === "/api/reports/revenue") {
     try {
+      const customerId = url.searchParams.get("customerId");
+      const shopId = url.searchParams.get("shopId");
+      const productName = url.searchParams.get("productName");
+      const ticketType = url.searchParams.get("ticketType");
+
+      // If a product is selected, count only that product.
+      // If a ticket type is selected, count only that ticket type.
+      // If neither is selected, count all products and tickets.
+      const productRevenue = productName
+  ? `COALESCE((
+      SELECT SUM(tp.Quantity * tp.UnitPrice)
+      FROM transactionproduct tp
+      JOIN product p ON p.ProductID = tp.ProductID
+      WHERE tp.TransactionID = t.TransactionID
+        AND p.Name = ?
+        AND p.IsDeleted = 0
+    ), 0)`
+  : ticketType
+    ? "0"
+    : `COALESCE((
+        SELECT SUM(tp.Quantity * tp.UnitPrice)
+        FROM transactionproduct tp
+        WHERE tp.TransactionID = t.TransactionID
+      ), 0)`;
+
+      const ticketRevenue = ticketType
+  ? `COALESCE((
+      SELECT SUM(tk.Quantity * tk.UnitPrice)
+      FROM ticket tk
+      WHERE tk.TransactionID = t.TransactionID
+        AND tk.Type = ?
+    ), 0)`
+  : productName
+    ? "0"
+    : `COALESCE((
+        SELECT SUM(tk.Quantity * tk.UnitPrice)
+        FROM ticket tk
+        WHERE tk.TransactionID = t.TransactionID
+      ), 0)`;
+
       let sql = `
         SELECT
           DATE(t.Date) AS SaleDate,
           t.PaymentType,
           COUNT(DISTINCT t.TransactionID) AS SaleCount,
-          COALESCE(SUM(vt.TotalAmount), 0) AS Revenue
+          COALESCE(SUM(${productRevenue} + ${ticketRevenue}), 0) AS Revenue
         FROM \`transaction\` t
-        LEFT JOIN v_transaction_totals vt ON vt.TransactionID = t.TransactionID
         WHERE 1=1
       `;
+
+      // Parameters for the revenue subqueries appear first in the SQL.
       const params = [];
+
+      if (productName) params.push(productName);
+      if (ticketType) params.push(ticketType);
 
       if (filters.startDate) {
         sql += " AND DATE(t.Date) >= ?";
         params.push(filters.startDate);
       }
+
       if (filters.endDate) {
         sql += " AND DATE(t.Date) <= ?";
         params.push(filters.endDate);
       }
+
       if (filters.paymentType) {
         sql += " AND t.PaymentType = ?";
         params.push(filters.paymentType);
       }
-      const customerId = url.searchParams.get("customerId");
+
       if (customerId) {
-        sql += " AND vt.CustomerID = ?";
+        sql += " AND t.CustomerID = ?";
         params.push(customerId);
       }
 
-      sql += " GROUP BY DATE(t.Date), t.PaymentType ORDER BY SaleDate DESC";
+      if (shopId) {
+        sql += " AND t.ShopID = ?";
+        params.push(shopId);
+      }
+
+      // When product and/or ticket type is selected, include only
+      // transactions containing at least one matching item.
+      const matchingConditions = [];
+      const matchingParams = [];
+
+      if (productName) {
+  matchingConditions.push(`
+    EXISTS (
+      SELECT 1
+      FROM transactionproduct tp
+      JOIN product p ON p.ProductID = tp.ProductID
+      WHERE tp.TransactionID = t.TransactionID
+        AND p.Name = ?
+        AND p.IsDeleted = 0
+    )
+  `);
+  matchingParams.push(productName);
+}
+
+      if (ticketType) {
+        matchingConditions.push(`
+          EXISTS (
+            SELECT 1
+            FROM ticket tk
+            WHERE tk.TransactionID = t.TransactionID
+              AND tk.Type = ?
+          )
+        `);
+        matchingParams.push(ticketType);
+      }
+
+      if (matchingConditions.length > 0) {
+        sql += ` AND (${matchingConditions.join(" OR ")})`;
+        params.push(...matchingParams);
+      }
+
+      sql += `
+        GROUP BY DATE(t.Date), t.PaymentType
+        ORDER BY SaleDate DESC
+      `;
+
       const [rows] = await pool.query(sql, params);
       return sendJson(res, 200, rows);
     } catch (error) {
