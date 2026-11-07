@@ -56,6 +56,7 @@ function Layout() {
             <NavLink to="/employees">Employees</NavLink>
             <NavLink to="/customers">Customers</NavLink>
             <NavLink to="/closures">Closures</NavLink>
+            <NavLink to="/shops">Shops</NavLink>
           </>
         )}
 
@@ -70,10 +71,6 @@ function Layout() {
           <>
             <p className="nav-label">Reports</p>
             <NavLink to="/reports">Reports hub</NavLink>
-            <NavLink to="/reports/revenue">Revenue</NavLink>
-            <NavLink to="/reports/closures">Closures report</NavLink>
-            <NavLink to="/reports/occupancy">Occupancy</NavLink>
-            <NavLink to="/reports/most-visited">Most visited</NavLink>
           </>
         )}
       </nav>

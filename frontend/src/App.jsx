@@ -8,14 +8,12 @@ import Signup from './pages/Signup.jsx'
 import Checkout from './pages/Checkout.jsx'
 import './App.css'
 import Animals from './pages/Animals.jsx'
+import Shop from './pages/Shop.jsx'
 import {
   ReportsHub,
-  OccupancyReport,
-  ProductSalesReport,
-  CustomerSpendingReport,
-  RevenueReport,
-  ClosuresReport,
-  MostVisitedReport,
+  RevenueReports,
+  CustomerReports,
+  OperationsReports,
 } from './pages/Reports.jsx'
 import Products from './pages/Products.jsx'
 import Species from './pages/Species.jsx'
@@ -30,6 +28,8 @@ import Attractions from './pages/Attractions.jsx'
 import Closures from './pages/Closures.jsx'
 import NewSale from './pages/NewSale.jsx'
 import CustomerLogin from './pages/CustomerLogin.jsx'
+import OnlineShop from './pages/OnlineShop.jsx'
+import Shops from './pages/Shops.jsx'
 
 function App() {
   return (
@@ -40,9 +40,11 @@ function App() {
       <Route path="/customer-login" element={<CustomerLogin />} />
 
       <Route element={<CustomerLayout />}>
+        <Route path="/shop" element={<Shop />} />
         <Route path="/enclosures" element={<CustomerEnclosures />} />
         <Route path="/attractions" element={<CustomerAttractions />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/shop" element={<OnlineShop />} />
         <Route path="/my-transactions" element={<MyTransactions />} />
         <Route path="/my-transactions/:id" element={<MyTransactions />} />
       </Route>
@@ -57,15 +59,13 @@ function App() {
         <Route path="/employees" element={<Employees />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/closures" element={<Closures />} />
+        <Route path="/shops" element={<Shops />} />
         <Route path="/products" element={<Products />} />
         <Route path="/new-sale" element={<NewSale />} />
         <Route path="/reports" element={<ReportsHub />} />
-        <Route path="/reports/occupancy" element={<OccupancyReport />} />
-        <Route path="/reports/sales" element={<ProductSalesReport />} />
-        <Route path="/reports/spending" element={<CustomerSpendingReport />} />
-        <Route path="/reports/revenue" element={<RevenueReport />} />
-        <Route path="/reports/closures" element={<ClosuresReport />} />
-        <Route path="/reports/most-visited" element={<MostVisitedReport />} />
+        <Route path="/reports/revenue" element={<RevenueReports />} />
+        <Route path="/reports/customers" element={<CustomerReports />} />
+        <Route path="/reports/operations" element={<OperationsReports />} />
         <Route path="*" element={<ComingSoon />} />
       </Route>
     </Routes>

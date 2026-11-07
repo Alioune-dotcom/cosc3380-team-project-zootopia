@@ -11,6 +11,8 @@ DROP TRIGGER IF EXISTS `trg_product_low_stock_alert`;
 DROP TRIGGER IF EXISTS `trg_animal_sick_alert`;
 DROP TRIGGER IF EXISTS `trg_animal_sick_quarantine_insert`;
 DROP TRIGGER IF EXISTS `trg_animal_sick_quarantine_update`;
+DROP TRIGGER IF EXISTS `trg_transaction_shop_rules`;
+DROP TRIGGER IF EXISTS `trg_ticket_online_only`;
 
 DELIMITER $$
 
@@ -129,22 +131,101 @@ BEGIN
   END IF;
 END$$
 
+-- online sale must use the online store; in-person sale must use a real shop
+-- and the cashier must be assigned to that shop (managers can ring up any shop)
+CREATE TRIGGER `trg_transaction_shop_rules`
+BEFORE INSERT ON `transaction`
+FOR EACH ROW
+BEGIN
+  DECLARE shop_type VARCHAR(20);
+  DECLARE shop_deleted INT;
+  DECLARE is_assigned INT;
+  DECLARE is_manager INT;
+
+  SELECT `ShopType`, `IsDeleted`
+  INTO shop_type, shop_deleted
+  FROM `shop`
+  WHERE `ShopID` = NEW.`ShopID`;
+
+  IF shop_type IS NULL OR shop_deleted = 1 THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Shop not found or is deleted.';
+  END IF;
+
+  IF NEW.`CustomerID` IS NOT NULL AND shop_type <> 'Online' THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Online sales must use the online store.';
+  END IF;
+
+  IF NEW.`EmployeeID` IS NOT NULL THEN
+    IF shop_type = 'Online' THEN
+      SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'In-person sales cannot use the online store.';
+    END IF;
+
+    SELECT COUNT(*) INTO is_assigned
+    FROM `employee_shop`
+    WHERE `EmployeeID` = NEW.`EmployeeID`
+      AND `ShopID` = NEW.`ShopID`;
+
+    SELECT COUNT(*) INTO is_manager
+    FROM `users`
+    WHERE `EmployeeID` = NEW.`EmployeeID`
+      AND `Role` = 'Manager'
+      AND `IsDeleted` = 0;
+
+    IF is_assigned = 0 AND is_manager = 0 THEN
+      SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Cashier is not assigned to this shop.';
+    END IF;
+  END IF;
+END$$
+
+-- tickets are only sold online
+CREATE TRIGGER `trg_ticket_online_only`
+BEFORE INSERT ON `ticket`
+FOR EACH ROW
+BEGIN
+  DECLARE tx_customer INT;
+
+  SELECT `CustomerID`
+  INTO tx_customer
+  FROM `transaction`
+  WHERE `TransactionID` = NEW.`TransactionID`;
+
+  IF tx_customer IS NULL THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Tickets can only be sold online.';
+  END IF;
+END$$
+
 -- decrease stock on sale; block oversell
+-- product must belong to the shop the sale happened at
 CREATE TRIGGER `trg_transactionproduct_stock`
 BEFORE INSERT ON `transactionproduct`
 FOR EACH ROW
 BEGIN
   DECLARE current_stock INT;
   DECLARE product_deleted INT;
+  DECLARE product_shop INT;
+  DECLARE sale_shop INT;
 
-  SELECT `QuantityInStock`, `IsDeleted`
-  INTO current_stock, product_deleted
+  SELECT `QuantityInStock`, `IsDeleted`, `ShopID`
+  INTO current_stock, product_deleted, product_shop
   FROM `product`
   WHERE `ProductID` = NEW.`ProductID`;
+
+  SELECT `ShopID`
+  INTO sale_shop
+  FROM `transaction`
+  WHERE `TransactionID` = NEW.`TransactionID`;
 
   IF current_stock IS NULL THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Product not found for this purchase.';
+  ELSEIF product_shop <> sale_shop THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Product is not sold at this shop.';
   ELSEIF product_deleted = 1 THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Product is deleted; cannot purchase.';

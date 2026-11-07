@@ -220,7 +220,8 @@ function Employees() {
 
         <label>Shops</label>
         <div>
-          {shops.map((s) => (
+          {/* cashiers work at physical shops, not the online store */}
+          {shops.filter((s) => s.ShopType !== 'Online').map((s) => (
             <label key={s.ShopID} style={{ display: 'block' }}>
               <input
                 type="checkbox"

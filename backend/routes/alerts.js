@@ -66,6 +66,34 @@ async function handleAlerts(req, res, pathname) {
     }
   }
 
+  // DELETE /api/alerts/clear-read  (delete every read alert)
+  if (req.method === "DELETE" && id === "clear-read") {
+    try {
+      const [result] = await pool.query("DELETE FROM alert WHERE IsRead = 1");
+      return sendJson(res, 200, { message: "Read alerts deleted", deleted: result.affectedRows });
+    } catch (error) {
+      console.error(error.message);
+      return sendJson(res, 500, { error: "Could not delete alerts" });
+    }
+  }
+
+  // DELETE /api/alerts/:id  (only if already read)
+  if (req.method === "DELETE" && id) {
+    try {
+      const [result] = await pool.query(
+        "DELETE FROM alert WHERE AlertID = ? AND IsRead = 1",
+        [id]
+      );
+      if (result.affectedRows === 0) {
+        return sendJson(res, 400, { error: "Alert not found or not read yet" });
+      }
+      return sendJson(res, 200, { message: "Alert deleted" });
+    } catch (error) {
+      console.error(error.message);
+      return sendJson(res, 500, { error: "Could not delete alert" });
+    }
+  }
+
   sendJson(res, 404, { error: "Route not found" });
 }
 

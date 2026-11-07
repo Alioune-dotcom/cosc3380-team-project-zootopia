@@ -29,6 +29,7 @@ function TransactionDetail({ customerId, transactionId }) {
   if (!order) return <p>Loading...</p>
 
   const ticketTotalQty = order.tickets.reduce((s, t) => s + t.Quantity, 0)
+  const itemTotalQty = order.products.reduce((s, p) => s + p.Quantity, 0)
 
   return (
     <div>
@@ -45,19 +46,21 @@ function TransactionDetail({ customerId, transactionId }) {
             <span>Tickets purchased</span>
           </div>
           <div className="stat-box">
+            <strong>{itemTotalQty}</strong>
+            <span>Shop items</span>
+          </div>
+          <div className="stat-box">
             <strong>${Number(order.totalAmount).toFixed(2)}</strong>
             <span>Order total</span>
           </div>
         </div>
       </div>
 
+      {order.tickets.length > 0 ? (
       <div className="page-card">
         <h3>Your tickets</h3>
         <p>Each line is a ticket type on this order — quantity shows how many you bought.</p>
-        {order.tickets.length === 0 ? (
-          <p>No tickets on this order.</p>
-        ) : (
-          order.tickets.map((t) => (
+        {order.tickets.map((t) => (
             <div key={t.TicketID} className="ticket-pass">
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                 <div>
@@ -73,15 +76,13 @@ function TransactionDetail({ customerId, transactionId }) {
                 ${Number(t.UnitPrice).toFixed(2)} each
               </div>
             </div>
-          ))
-        )}
+        ))}
       </div>
+      ) : null}
 
+      {order.products.length > 0 ? (
       <div className="page-card">
-        <h3>Products</h3>
-        {order.products.length === 0 ? (
-          <p>No products on this order.</p>
-        ) : (
+        <h3>Shop items</h3>
           <table className="data-table">
             <thead>
               <tr>
@@ -102,8 +103,8 @@ function TransactionDetail({ customerId, transactionId }) {
               ))}
             </tbody>
           </table>
-        )}
       </div>
+      ) : null}
 
       {order.enclosures.length > 0 ? (
         <div className="page-card">
@@ -151,14 +152,18 @@ function TransactionList({ customer }) {
       {orders.length === 0 && !error ? (
         <div className="page-card">
           <p>No purchases yet.</p>
-          <Link className="btn gold" to="/checkout">Buy tickets</Link>
+<div className="form-buttons">
+  <Link className="btn gold" to="/checkout">Buy tickets</Link>
+  <Link className="btn secondary" to="/shop">Visit the online shop</Link>
+</div>
         </div>
       ) : (
         <table className="data-table">
           <thead>
             <tr>
               <th>Date</th>
-              <th>Tickets bought</th>
+<th>Tickets</th>
+<th>Shop items</th>
               <th>Payment</th>
               <th>Total</th>
               <th>Details</th>
@@ -168,12 +173,13 @@ function TransactionList({ customer }) {
             {orders.map((order) => (
               <tr key={order.transactionId}>
                 <td>{String(order.date).slice(0, 10)}</td>
-                <td><strong>{order.ticketCount}</strong> ticket(s)</td>
+<td><strong>{order.ticketCount}</strong></td>
+<td><strong>{order.productCount}</strong></td>
                 <td>{order.paymentType}</td>
                 <td>${Number(order.totalAmount).toFixed(2)}</td>
                 <td>
                   <Link to={'/my-transactions/' + order.transactionId}>
-                    View tickets & receipt
+                    View receipt
                   </Link>
                 </td>
               </tr>
