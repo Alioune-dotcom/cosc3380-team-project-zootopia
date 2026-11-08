@@ -40,7 +40,6 @@ function App() {
       <Route path="/customer-login" element={<CustomerLogin />} />
 
       <Route element={<CustomerLayout />}>
-        <Route path="/shop" element={<Shop />} />
         <Route path="/enclosures" element={<CustomerEnclosures />} />
         <Route path="/attractions" element={<CustomerAttractions />} />
         <Route path="/checkout" element={<Checkout />} />
