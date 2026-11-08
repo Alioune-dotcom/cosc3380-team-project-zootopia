@@ -150,7 +150,7 @@ async function handleReports(req, res, pathname) {
     }
   }
 
-    // GET /api/reports/revenue?startDate=&endDate=&paymentType=&customerId=&shopId=&productId=&ticketType=
+  // GET /api/reports/revenue?startDate=&endDate=&paymentType=&customerId=&shopId=&productId=&ticketType=
   if (req.method === "GET" && pathname === "/api/reports/revenue") {
     try {
       const customerId = url.searchParams.get("customerId");
@@ -162,7 +162,7 @@ async function handleReports(req, res, pathname) {
       // If a ticket type is selected, count only that ticket type.
       // If neither is selected, count all products and tickets.
       const productRevenue = productName
-  ? `COALESCE((
+        ? `COALESCE((
       SELECT SUM(tp.Quantity * tp.UnitPrice)
       FROM transactionproduct tp
       JOIN product p ON p.ProductID = tp.ProductID
@@ -170,24 +170,24 @@ async function handleReports(req, res, pathname) {
         AND p.Name = ?
         AND p.IsDeleted = 0
     ), 0)`
-  : ticketType
-    ? "0"
-    : `COALESCE((
+        : ticketType
+          ? "0"
+          : `COALESCE((
         SELECT SUM(tp.Quantity * tp.UnitPrice)
         FROM transactionproduct tp
         WHERE tp.TransactionID = t.TransactionID
       ), 0)`;
 
       const ticketRevenue = ticketType
-  ? `COALESCE((
+        ? `COALESCE((
       SELECT SUM(tk.Quantity * tk.UnitPrice)
       FROM ticket tk
       WHERE tk.TransactionID = t.TransactionID
         AND tk.Type = ?
     ), 0)`
-  : productName
-    ? "0"
-    : `COALESCE((
+        : productName
+          ? "0"
+          : `COALESCE((
         SELECT SUM(tk.Quantity * tk.UnitPrice)
         FROM ticket tk
         WHERE tk.TransactionID = t.TransactionID
@@ -240,7 +240,7 @@ async function handleReports(req, res, pathname) {
       const matchingParams = [];
 
       if (productName) {
-  matchingConditions.push(`
+        matchingConditions.push(`
     EXISTS (
       SELECT 1
       FROM transactionproduct tp
@@ -250,8 +250,8 @@ async function handleReports(req, res, pathname) {
         AND p.IsDeleted = 0
     )
   `);
-  matchingParams.push(productName);
-}
+        matchingParams.push(productName);
+      }
 
       if (ticketType) {
         matchingConditions.push(`
@@ -323,6 +323,170 @@ async function handleReports(req, res, pathname) {
   }
 
 
+  // GET /api/reports/visitor-activity
+  // ?startDate=&endDate=&ticketType=&enclosureId=&habitatType=
+  if (req.method === "GET" && pathname === "/api/reports/visitor-activity") {
+    try {
+      const ticketType = url.searchParams.get("ticketType");
+      const enclosureId = url.searchParams.get("enclosureId");
+      const habitatType = url.searchParams.get("habitatType");
+
+      // 1. Ticket popularity
+      let ticketSql = `
+        SELECT
+          tk.Type AS TicketType,
+          COALESCE(SUM(tk.Quantity), 0) AS TicketsSold
+        FROM ticket tk
+        JOIN \`transaction\` t
+          ON t.TransactionID = tk.TransactionID
+        JOIN customer c
+          ON c.CustomerID = t.CustomerID
+        WHERE t.CustomerID IS NOT NULL
+          AND c.IsDeleted = 0
+      `;
+      const ticketParams = [];
+
+      if (filters.startDate) {
+        ticketSql += " AND DATE(t.Date) >= ?";
+        ticketParams.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        ticketSql += " AND DATE(t.Date) <= ?";
+        ticketParams.push(filters.endDate);
+      }
+
+      if (ticketType) {
+        ticketSql += " AND tk.Type = ?";
+        ticketParams.push(ticketType);
+      }
+
+      ticketSql += `
+        GROUP BY tk.Type
+        ORDER BY TicketsSold DESC
+      `;
+
+      const [ticketRows] = await pool.query(ticketSql, ticketParams);
+
+      // 2. Unique customers who purchased tickets
+      let customerSql = `
+        SELECT COUNT(DISTINCT t.CustomerID) AS UniqueCustomers
+        FROM \`transaction\` t
+        JOIN ticket tk
+          ON tk.TransactionID = t.TransactionID
+        JOIN customer c
+          ON c.CustomerID = t.CustomerID
+        WHERE t.CustomerID IS NOT NULL
+          AND c.IsDeleted = 0
+      `;
+      const customerParams = [];
+
+      if (filters.startDate) {
+        customerSql += " AND DATE(t.Date) >= ?";
+        customerParams.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        customerSql += " AND DATE(t.Date) <= ?";
+        customerParams.push(filters.endDate);
+      }
+
+      if (ticketType) {
+        customerSql += " AND tk.Type = ?";
+        customerParams.push(ticketType);
+      }
+
+      const [customerRows] = await pool.query(customerSql, customerParams);
+
+      // 3. Planned enclosure visits
+      let enclosureSql = `
+        SELECT
+          e.EnclosureID,
+          e.Name AS EnclosureName,
+          e.Location,
+          e.HabitatType,
+          COUNT(DISTINCT te.TransactionID) AS VisitCount,
+          COUNT(DISTINCT t.CustomerID) AS UniqueCustomers
+        FROM transaction_enclosure te
+        JOIN \`transaction\` t
+          ON t.TransactionID = te.TransactionID
+        JOIN customer c
+          ON c.CustomerID = t.CustomerID
+        JOIN enclosure e
+          ON e.EnclosureID = te.EnclosureID
+        WHERE t.CustomerID IS NOT NULL
+          AND c.IsDeleted = 0
+          AND e.IsDeleted = 0
+          AND e.EnclosureID <> 6
+      `;
+      const enclosureParams = [];
+
+      if (filters.startDate) {
+        enclosureSql += " AND DATE(t.Date) >= ?";
+        enclosureParams.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        enclosureSql += " AND DATE(t.Date) <= ?";
+        enclosureParams.push(filters.endDate);
+      }
+
+      if (enclosureId) {
+        enclosureSql += " AND e.EnclosureID = ?";
+        enclosureParams.push(enclosureId);
+      }
+
+      if (habitatType) {
+        enclosureSql += " AND e.HabitatType = ?";
+        enclosureParams.push(habitatType);
+      }
+
+      enclosureSql += `
+        GROUP BY
+          e.EnclosureID,
+          e.Name,
+          e.Location,
+          e.HabitatType
+        ORDER BY VisitCount DESC
+      `;
+
+      const [enclosureRows] = await pool.query(
+        enclosureSql,
+        enclosureParams
+      );
+
+      // 4. Combine the results into one report
+      const totalTicketsSold = ticketRows.reduce(
+        (total, row) => total + Number(row.TicketsSold),
+        0
+      );
+
+      const totalPlannedVisits = enclosureRows.reduce(
+        (total, row) => total + Number(row.VisitCount),
+        0
+      );
+
+      return sendJson(res, 200, {
+        summary: {
+          TotalTicketsSold: totalTicketsSold,
+          UniqueCustomers: customerRows[0].UniqueCustomers,
+          TotalPlannedVisits: totalPlannedVisits,
+          MostPopularTicketType: ticketRows[0]?.TicketType || null,
+          MostPopularEnclosure: enclosureRows[0]?.EnclosureName || null
+        },
+        ticketPopularity: ticketRows,
+        plannedVisits: enclosureRows
+      });
+
+    } catch (error) {
+      console.error(error);
+      return sendJson(res, 500, {
+        error: "Could not get visitor activity report"
+      });
+    }
+  }
+
+
   // GET /api/reports/most-visited?startDate=&endDate=
   if (req.method === "GET" && pathname === "/api/reports/most-visited") {
     try {
@@ -366,10 +530,49 @@ async function handleReports(req, res, pathname) {
     }
   }
 
-    // GET /api/reports/animal-population
+
+  // GET /api/reports/animal-population
   if (req.method === "GET" && pathname === "/api/reports/animal-population") {
     try {
-      const [summaryRows] = await pool.query(`
+      const searchParams = new URL(req.url, "http://localhost").searchParams;
+
+      const speciesId = searchParams.get("speciesId");
+      const enclosureId = searchParams.get("enclosureId");
+      const sex = searchParams.get("sex");
+      const healthStatus = searchParams.get("healthStatus");
+
+      // Build shared filters using parameterized SQL.
+      const filterConditions = [];
+      const filterParams = [];
+
+      if (speciesId) {
+        filterConditions.push("a.SpeciesID = ?");
+        filterParams.push(speciesId);
+      }
+
+      if (enclosureId) {
+        filterConditions.push("a.EnclosureID = ?");
+        filterParams.push(enclosureId);
+      }
+
+      if (sex) {
+        filterConditions.push("a.Sex = ?");
+        filterParams.push(sex);
+      }
+
+      if (healthStatus === "healthy") {
+        filterConditions.push("a.IsSick = 0");
+      } else if (healthStatus === "sick") {
+        filterConditions.push("a.IsSick = 1");
+      }
+
+      const filterSql = filterConditions.length
+        ? ` AND ${filterConditions.join(" AND ")}`
+        : "";
+
+      // Overall population and health summary.
+      const [summaryRows] = await pool.query(
+        `
         SELECT
           COUNT(*) AS TotalAnimals,
           COALESCE(SUM(a.IsSick = 0), 0) AS HealthyAnimals,
@@ -380,43 +583,152 @@ async function handleReports(req, res, pathname) {
         WHERE a.IsDeleted = 0
           AND s.IsDeleted = 0
           AND e.IsDeleted = 0
-      `);
+          ${filterSql}
+      `,
+        [...filterParams]
+      );
 
-      const [speciesRows] = await pool.query(`
+      // Population by species.
+      const [speciesRows] = await pool.query(
+        `
         SELECT
           s.CommonName,
           s.ConservationStatus,
-          COUNT(a.AnimalID) AS AnimalCount
+          COUNT(filtered.AnimalID) AS AnimalCount
         FROM species s
-        LEFT JOIN animal a
-          ON a.SpeciesID = s.SpeciesID
-          AND a.IsDeleted = 0
+        LEFT JOIN (
+          SELECT
+            a.AnimalID,
+            a.SpeciesID
+          FROM animal a
+          JOIN species s2 ON s2.SpeciesID = a.SpeciesID
+          JOIN enclosure e2 ON e2.EnclosureID = a.EnclosureID
+          WHERE a.IsDeleted = 0
+            AND s2.IsDeleted = 0
+            AND e2.IsDeleted = 0
+            ${filterSql}
+        ) filtered ON filtered.SpeciesID = s.SpeciesID
         WHERE s.IsDeleted = 0
+          ${speciesId ? "AND s.SpeciesID = ?" : ""}
         GROUP BY s.SpeciesID, s.CommonName, s.ConservationStatus
         ORDER BY AnimalCount DESC, s.CommonName
-      `);
+      `,
+        [
+          ...filterParams,
+          ...(speciesId ? [speciesId] : [])
+        ]
+      );
 
-      const [enclosureRows] = await pool.query(`
+      // Population by enclosure.
+      const [enclosureRows] = await pool.query(
+        `
         SELECT
           e.Name AS EnclosureName,
           e.HabitatType,
-          COUNT(a.AnimalID) AS AnimalCount
+          e.Capacity,
+          COUNT(filtered.AnimalID) AS AnimalCount,
+          GREATEST(e.Capacity - COUNT(filtered.AnimalID), 0) AS RemainingCapacity,
+          ROUND(
+            COUNT(filtered.AnimalID) * 100.0 / NULLIF(e.Capacity, 0),
+            1
+          ) AS CapacityPercentage
         FROM enclosure e
-        LEFT JOIN animal a
-          ON a.EnclosureID = e.EnclosureID
-          AND a.IsDeleted = 0
+        LEFT JOIN (
+          SELECT
+            a.AnimalID,
+            a.EnclosureID
+          FROM animal a
+          JOIN species s2 ON s2.SpeciesID = a.SpeciesID
+          JOIN enclosure e2 ON e2.EnclosureID = a.EnclosureID
+          WHERE a.IsDeleted = 0
+            AND s2.IsDeleted = 0
+            AND e2.IsDeleted = 0
+            ${filterSql}
+        ) filtered ON filtered.EnclosureID = e.EnclosureID
         WHERE e.IsDeleted = 0
-        GROUP BY e.EnclosureID, e.Name, e.HabitatType
+          ${enclosureId ? "AND e.EnclosureID = ?" : ""}
+        GROUP BY e.EnclosureID, e.Name, e.HabitatType, e.Capacity
         ORDER BY AnimalCount DESC, e.Name
-      `);
+      `,
+        [
+          ...filterParams,
+          ...(enclosureId ? [enclosureId] : [])
+        ]
+      );
+
+      // Population by sex.
+      const [sexRows] = await pool.query(
+        `
+        SELECT
+          a.Sex,
+          COUNT(*) AS AnimalCount
+        FROM animal a
+        JOIN species s ON s.SpeciesID = a.SpeciesID
+        JOIN enclosure e ON e.EnclosureID = a.EnclosureID
+        WHERE a.IsDeleted = 0
+          AND s.IsDeleted = 0
+          AND e.IsDeleted = 0
+          ${filterSql}
+        GROUP BY a.Sex
+        ORDER BY a.Sex
+      `,
+        [...filterParams]
+      );
+
+
+      // Average enclosure occupancy (independent of animal filters).
+      const [occupancyRows] = await pool.query(
+        `
+        SELECT
+          COUNT(*) AS TotalEnclosures,
+          COALESCE(SUM(AnimalCount), 0) AS OccupiedAnimals,
+          COALESCE(SUM(Capacity), 0) AS TotalCapacity,
+          COALESCE(
+            ROUND(
+              AVG(
+                CASE
+                  WHEN Capacity > 0
+                  THEN AnimalCount * 100.0 / Capacity
+                END
+              ),
+              1
+            ),
+            0
+          ) AS AverageOccupancy
+        FROM (
+          SELECT
+            e.EnclosureID,
+            e.Capacity,
+            COUNT(a.AnimalID) AS AnimalCount
+          FROM enclosure e
+          LEFT JOIN animal a
+            ON a.EnclosureID = e.EnclosureID
+            AND a.IsDeleted = 0
+            AND EXISTS (
+              SELECT 1
+              FROM species s
+              WHERE s.SpeciesID = a.SpeciesID
+                AND s.IsDeleted = 0
+            )
+          WHERE e.IsDeleted = 0
+            ${enclosureId ? "AND e.EnclosureID = ?" : ""}
+          GROUP BY e.EnclosureID, e.Capacity
+        ) occupancy
+      `,
+        enclosureId ? [enclosureId] : []
+      );
+
 
       return sendJson(res, 200, {
         summary: summaryRows[0],
         bySpecies: speciesRows,
-        byEnclosure: enclosureRows
+        byEnclosure: enclosureRows,
+        bySex: sexRows,
+        occupancy: occupancyRows[0]
       });
+
     } catch (error) {
-      console.error(error.message);
+      console.error(error);
       return sendJson(res, 500, {
         error: "Could not get animal population report"
       });

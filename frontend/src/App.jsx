@@ -13,7 +13,7 @@ import {
   ReportsHub,
   RevenueReport,
   AnimalPopulationReport,
-  ZooOperationsReport,
+  VisitorActivityReport,
 } from './pages/Reports.jsx'
 import Products from './pages/Products.jsx'
 import Species from './pages/Species.jsx'
@@ -63,9 +63,9 @@ function App() {
         <Route path="/products" element={<Products />} />
         <Route path="/new-sale" element={<NewSale />} />
         <Route path="/reports" element={<ReportsHub />} />
-<Route path="/reports/revenue" element={<RevenueReport />} />
-<Route path="/reports/animals" element={<AnimalPopulationReport />} />
-<Route path="/reports/operations" element={<ZooOperationsReport />} />
+        <Route path="/reports/revenue" element={<RevenueReport />} />
+        <Route path="/reports/animals" element={<AnimalPopulationReport />} />
+        <Route path="/reports/visitors" element={<VisitorActivityReport />} />
         <Route path="*" element={<ComingSoon />} />
       </Route>
     </Routes>

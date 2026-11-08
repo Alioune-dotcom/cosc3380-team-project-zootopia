@@ -53,6 +53,7 @@ function toBars(items, valueKey, labelKey) {
 }
 
 
+
 export function ReportsHub() {
   const cards = [
     {
@@ -63,12 +64,12 @@ export function ReportsHub() {
     {
       to: '/reports/animals',
       title: 'Animal Population',
-      blurb: 'Monitor animal counts, health, species, and enclosures.',
+      blurb: 'Monitor animal counts, health, species, and individual animals.',
     },
     {
-      to: '/reports/operations',
-      title: 'Zoo Operations',
-      blurb: 'Monitor enclosure occupancy, visitor traffic, and zoo closures.',
+      to: '/reports/visitors',
+      title: 'Visitor Activity',
+      blurb: 'Analyze ticket popularity, customer activity, and planned enclosure visits.',
     },
   ]
 
@@ -77,8 +78,7 @@ export function ReportsHub() {
       <div className="page-card">
         <h2 style={{ marginTop: 0 }}>Zoo Reports</h2>
         <p style={{ color: 'var(--muted)', marginBottom: 0 }}>
-          Select one of the reports below to view the zoo's financial,
-          animal population, and operational information.
+          Explore the zoo's financial performance, animal population, and visitor activity.
         </p>
       </div>
 
@@ -96,18 +96,53 @@ export function ReportsHub() {
 
 
 export function AnimalPopulationReport() {
+  const emptyFilters = {
+    speciesId: '',
+    enclosureId: '',
+    sex: '',
+    healthStatus: '',
+  }
+
+  const [filters, setFilters] = useState(emptyFilters)
   const [data, setData] = useState(null)
+  const [species, setSpecies] = useState([])
+  const [enclosures, setEnclosures] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasGenerated, setHasGenerated] = useState(false)
 
-  async function generateReport() {
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/species').then((res) => res.json()),
+      fetch('/api/enclosures').then((res) => res.json()),
+    ])
+      .then(([speciesData, enclosureData]) => {
+        setSpecies(Array.isArray(speciesData) ? speciesData : [])
+        setEnclosures(Array.isArray(enclosureData) ? enclosureData : [])
+      })
+      .catch((err) => {
+        console.error('Could not load animal population filters:', err)
+      })
+  }, [])
+
+  async function generateReport(selectedFilters = filters) {
     setLoading(true)
     setError('')
     setHasGenerated(true)
 
     try {
-      const response = await fetch('/api/reports/animal-population')
+      const params = new URLSearchParams()
+
+      Object.entries(selectedFilters).forEach(([key, value]) => {
+        if (value) params.set(key, value)
+      })
+
+      const query = params.toString()
+      const url = query
+        ? `/api/reports/animal-population?${query}`
+        : '/api/reports/animal-population'
+
+      const response = await fetch(url)
       const result = await response.json()
 
       if (!response.ok) {
@@ -123,7 +158,21 @@ export function AnimalPopulationReport() {
     }
   }
 
+  function clearFilters() {
+    setFilters(emptyFilters)
+    if (hasGenerated) {
+      generateReport(emptyFilters)
+    }
+  }
+
   const summary = data?.summary
+  const sexCounts = data?.bySex || []
+
+  const maleCount =
+    sexCounts.find((row) => row.Sex === 'Male')?.AnimalCount ?? 0
+
+  const femaleCount =
+    sexCounts.find((row) => row.Sex === 'Female')?.AnimalCount ?? 0
 
   return (
     <div>
@@ -133,24 +182,96 @@ export function AnimalPopulationReport() {
           View the zoo's active animal population, health counts, species,
           and enclosure distribution.
         </p>
-        <p style={{ color: 'var(--muted)', fontSize: 14 }}>
-          Click Generate to load the latest animal population data.
-        </p>
-        <button
-          type="button"
-          className="gold"
-          onClick={generateReport}
-          disabled={loading}
-        >
-          {loading ? 'Generating…' : hasGenerated ? 'Regenerate report' : 'Generate report'}
-        </button>
+
+        <div className="search-form">
+          <label>
+            Species
+            <select
+              value={filters.speciesId}
+              onChange={(e) =>
+                setFilters({ ...filters, speciesId: e.target.value })
+              }
+            >
+              <option value="">All species</option>
+              {species.map((item) => (
+                <option key={item.SpeciesID} value={item.SpeciesID}>
+                  {item.CommonName}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Enclosure
+            <select
+              value={filters.enclosureId}
+              onChange={(e) =>
+                setFilters({ ...filters, enclosureId: e.target.value })
+              }
+            >
+              <option value="">All enclosures</option>
+              {enclosures.map((item) => (
+                <option key={item.EnclosureID} value={item.EnclosureID}>
+                  {item.Name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Sex
+            <select
+              value={filters.sex}
+              onChange={(e) =>
+                setFilters({ ...filters, sex: e.target.value })
+              }
+            >
+              <option value="">All</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </label>
+
+          <label>
+            Health status
+            <select
+              value={filters.healthStatus}
+              onChange={(e) =>
+                setFilters({ ...filters, healthStatus: e.target.value })
+              }
+            >
+              <option value="">All statuses</option>
+              <option value="healthy">Healthy</option>
+              <option value="sick">Sick</option>
+            </select>
+          </label>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button
+            type="button"
+            className="gold"
+            onClick={() => generateReport(filters)}
+            disabled={loading}
+          >
+            {loading ? 'Generating…' : 'Apply Filters'}
+          </button>
+
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={loading}
+          >
+            Clear Filters
+          </button>
+        </div>
       </div>
 
       {error ? <p className="message error">{error}</p> : null}
 
       {!hasGenerated && !loading ? (
         <div className="insight">
-          Report not generated yet — click Generate when you are ready.
+          Report not generated yet — select your filters and click Apply Filters.
         </div>
       ) : null}
 
@@ -168,6 +289,14 @@ export function AnimalPopulationReport() {
             <div className="stat-box">
               <strong>{summary?.SickAnimals ?? 0}</strong>
               <span>Sick animals</span>
+            </div>
+            <div className="stat-box">
+              <strong>{maleCount}</strong>
+              <span>Male animals</span>
+            </div>
+            <div className="stat-box">
+              <strong>{femaleCount}</strong>
+              <span>Female animals</span>
             </div>
           </div>
 
@@ -192,27 +321,307 @@ export function AnimalPopulationReport() {
               </tbody>
             </table>
           </div>
+        </>
+      ) : null}
+    </div>
+  )
+}
+
+
+
+export function VisitorActivityReport() {
+  const emptyFilters = {
+    startDate: '',
+    endDate: '',
+    ticketType: '',
+    enclosureId: '',
+    habitatType: '',
+  }
+
+  const [filters, setFilters] = useState(emptyFilters)
+  const [enclosures, setEnclosures] = useState([])
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [hasGenerated, setHasGenerated] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/enclosures')
+      .then((res) => res.json())
+      .then((result) => {
+        setEnclosures(Array.isArray(result) ? result : [])
+      })
+      .catch((err) => {
+        console.error('Could not load enclosures:', err)
+      })
+  }, [])
+
+  const habitatTypes = [
+    ...new Set(enclosures.map((item) => item.HabitatType).filter(Boolean)),
+  ].sort()
+
+  async function generateReport(selectedFilters = filters) {
+    setLoading(true)
+    setError('')
+    setHasGenerated(true)
+
+    try {
+      const url = buildUrl(
+        '/api/reports/visitor-activity',
+        selectedFilters
+      )
+
+      const response = await fetch(url)
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not generate report')
+      }
+
+      setData(result)
+    } catch (err) {
+      setError(err.message || 'Could not connect to the server')
+      setData(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function clearFilters() {
+    setFilters(emptyFilters)
+
+    if (hasGenerated) {
+      generateReport(emptyFilters)
+    }
+  }
+
+  const summary = data?.summary
+  const ticketRows = data?.ticketPopularity || []
+  const visitRows = data?.plannedVisits || []
+
+  return (
+    <div>
+      <div className="page-card">
+        <h2 style={{ marginTop: 0 }}>Visitor Activity</h2>
+        <p style={{ color: 'var(--muted)' }}>
+          Analyze ticket preferences, customer activity, and the enclosures
+          customers plan to visit.
+        </p>
+
+        <div className="search-form">
+
+          {/* Date Range */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <h3 style={{ marginBottom: 4 }}>Date Range</h3>
+            <p style={{ color: 'var(--muted)', marginTop: 0 }}>
+              Applies to both ticket purchases and planned enclosure visits.
+            </p>
+          </div>
+
+          <label>
+            Start date
+            <input
+              type="date"
+              value={filters.startDate}
+              onChange={(e) =>
+                setFilters({ ...filters, startDate: e.target.value })
+              }
+            />
+          </label>
+
+          <label>
+            End date
+            <input
+              type="date"
+              value={filters.endDate}
+              onChange={(e) =>
+                setFilters({ ...filters, endDate: e.target.value })
+              }
+            />
+          </label>
+
+          {/* Ticket Purchase Filters */}
+          <div style={{ gridColumn: '1 / -1', marginTop: 12 }}>
+            <h3 style={{ marginBottom: 4 }}>Ticket Purchase Filters</h3>
+            <p style={{ color: 'var(--muted)', marginTop: 0 }}>
+              Filter ticket popularity and unique customer counts.
+            </p>
+          </div>
+
+          <label>
+            Ticket type
+            <select
+              value={filters.ticketType}
+              onChange={(e) =>
+                setFilters({ ...filters, ticketType: e.target.value })
+              }
+            >
+              <option value="">All ticket types</option>
+              <option value="Adult">Adult</option>
+              <option value="Child">Child</option>
+              <option value="Senior">Senior</option>
+            </select>
+          </label>
+
+          {/* Planned Visit Filters */}
+          <div style={{ gridColumn: '1 / -1', marginTop: 12 }}>
+            <h3 style={{ marginBottom: 4 }}>Planned Visit Filters</h3>
+            <p style={{ color: 'var(--muted)', marginTop: 0 }}>
+              Filter customer interest in specific enclosures and habitats.
+            </p>
+          </div>
+
+          <label>
+            Enclosure
+            <select
+              value={filters.enclosureId}
+              onChange={(e) =>
+                setFilters({ ...filters, enclosureId: e.target.value })
+              }
+            >
+              <option value="">All enclosures</option>
+              {enclosures.map((item) => (
+                <option key={item.EnclosureID} value={item.EnclosureID}>
+                  {item.Name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Habitat type
+            <select
+              value={filters.habitatType}
+              onChange={(e) =>
+                setFilters({ ...filters, habitatType: e.target.value })
+              }
+            >
+              <option value="">All habitat types</option>
+              {habitatTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button
+            type="button"
+            className="gold"
+            onClick={() => generateReport(filters)}
+            disabled={loading}
+          >
+            {loading ? 'Generating…' : 'Apply Filters'}
+          </button>
+
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={loading}
+          >
+            Clear Filters
+          </button>
+        </div>
+      </div>
+
+      {error ? <p className="message error">{error}</p> : null}
+
+      {!hasGenerated && !loading ? (
+        <div className="insight">
+          Report not generated yet — select your filters and click Apply Filters.
+        </div>
+      ) : null}
+
+      {loading ? <p>Generating report…</p> : null}
+
+      {data && !loading && !error ? (
+        <>
+          <div className="kpi-row">
+            <div className="stat-box">
+              <strong>{Number(summary?.TotalTicketsSold || 0)}</strong>
+              <span>Tickets sold</span>
+            </div>
+
+            <div className="stat-box">
+              <strong>{summary?.MostPopularTicketType || '—'}</strong>
+              <span>Most popular ticket</span>
+            </div>
+
+            <div className="stat-box">
+              <strong>{Number(summary?.UniqueCustomers || 0)}</strong>
+              <span>Unique customers</span>
+            </div>
+
+            <div className="stat-box">
+              <strong>{Number(summary?.TotalPlannedVisits || 0)}</strong>
+              <span>Planned enclosure visits</span>
+            </div>
+
+            <div className="stat-box">
+              <strong>{summary?.MostPopularEnclosure || '—'}</strong>
+              <span>Most popular enclosure</span>
+            </div>
+          </div>
 
           <div className="page-card">
-            <h3 style={{ marginTop: 0 }}>Population by enclosure</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Enclosure</th>
-                  <th>Habitat type</th>
-                  <th>Animal count</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.byEnclosure.map((row, index) => (
-                  <tr key={row.EnclosureName + index}>
-                    <td>{row.EnclosureName}</td>
-                    <td>{row.HabitatType || '—'}</td>
-                    <td>{row.AnimalCount}</td>
+            <h3 style={{ marginTop: 0 }}>Ticket popularity</h3>
+
+            {ticketRows.length > 0 ? (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ticket type</th>
+                    <th>Tickets sold</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {ticketRows.map((row) => (
+                    <tr key={row.TicketType}>
+                      <td>{row.TicketType}</td>
+                      <td>{Number(row.TicketsSold)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No ticket sales found for these filters.</p>
+            )}
+          </div>
+
+          <div className="page-card">
+            <h3 style={{ marginTop: 0 }}>Planned enclosure visits</h3>
+            <p style={{ color: 'var(--muted)' }}>
+              Shows the enclosures customers selected during checkout.
+            </p>
+
+            {visitRows.length > 0 ? (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Enclosure</th>
+                    <th>Location</th>
+                    <th>Habitat type</th>
+                    <th>Planned visits</th>
+                    <th>Unique customers</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visitRows.map((row) => (
+                    <tr key={row.EnclosureID}>
+                      <td>{row.EnclosureName}</td>
+                      <td>{row.Location || '—'}</td>
+                      <td>{row.HabitatType || '—'}</td>
+                      <td>{Number(row.VisitCount)}</td>
+                      <td>{Number(row.UniqueCustomers)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No planned enclosure visits found for these filters.</p>
+            )}
           </div>
         </>
       ) : null}
@@ -233,38 +642,71 @@ export function OccupancyReport() {
 
   return (
     <ReportPage
-      title="Enclosure occupancy"
-      description="Live capacity vs animals on exhibit. Use this before adding animals or planning moves."
+      title="Zoo Capacity"
+      description="Evaluate habitat utilization, available spaces, and enclosures approaching their capacity."
       url="/api/reports/enclosure-occupancy"
       filters={filters}
       rowKey="EnclosureID"
       columns={[
         { key: 'EnclosureName', label: 'Enclosure' },
-        { key: 'Capacity', label: 'Capacity' },
-        { key: 'AnimalCount', label: 'Animals' },
-        { key: 'RemainingCapacity', label: 'Spots left' },
-        { key: 'CapacityPercentage', label: '% full' },
+        { key: 'Capacity', label: 'Total Capacity' },
+        { key: 'AnimalCount', label: 'Animals Housed' },
+        { key: 'RemainingCapacity', label: 'Available Spaces' },
+        { key: 'CapacityPercentage', label: '% Full' },
       ]}
       summarize={(rows) => {
         if (!rows.length) return []
-        const fullest = [...rows].sort((a, b) => b.CapacityPercentage - a.CapacityPercentage)[0]
-        const emptiest = [...rows].sort((a, b) => a.CapacityPercentage - b.CapacityPercentage)[0]
-        const avg = rows.reduce((s, r) => s + Number(r.CapacityPercentage), 0) / rows.length
+
+        const totalCapacity = rows.reduce(
+          (sum, row) => sum + Number(row.Capacity || 0),
+          0
+        )
+
+        const animalsHoused = rows.reduce(
+          (sum, row) => sum + Number(row.AnimalCount || 0),
+          0
+        )
+
+        const availableSpaces = rows.reduce(
+          (sum, row) => sum + Math.max(0, Number(row.RemainingCapacity || 0)),
+          0
+        )
+
+        const occupiedEnclosures = rows.filter(
+          (row) => Number(row.AnimalCount) > 0
+        ).length
+
+        const nearCapacity = rows.filter((row) => {
+          const percentage = Number(row.CapacityPercentage || 0)
+          return percentage >= 80 && percentage < 100
+        }).length
+
+        const atCapacity = rows.filter(
+          (row) => Number(row.CapacityPercentage || 0) >= 100
+        ).length
+
+        const avgFill = totalCapacity > 0
+          ? (animalsHoused / totalCapacity) * 100
+          : 0
+
         return [
-          { label: 'Avg fill', value: avg.toFixed(0) + '%' },
-          { label: 'Tightest', value: fullest.EnclosureName },
-          { label: 'Most open', value: emptiest.EnclosureName },
-          { insight: `${fullest.EnclosureName} is ${fullest.CapacityPercentage}% full.` },
+          { label: 'Animals housed', value: animalsHoused },
+          { label: 'Total habitat capacity', value: totalCapacity },
+          { label: 'Available spaces', value: availableSpaces },
+          { label: 'Occupied enclosures', value: `${occupiedEnclosures} / ${rows.length}` },
+          { label: 'Near capacity (80%+)', value: nearCapacity },
+          { label: 'At/over capacity', value: atCapacity },
+          { insight: `Overall habitat utilization is ${avgFill.toFixed(1)}%.` },
         ]
       }}
       bar={(rows) => ({
-        title: 'Fill rate by enclosure',
+        title: 'Capacity utilization by enclosure',
         items: [...rows]
-          .sort((a, b) => b.CapacityPercentage - a.CapacityPercentage)
-          .map((r) => ({
-            label: r.EnclosureName,
-            pct: Math.min(100, Number(r.CapacityPercentage) || 0),
-            display: r.CapacityPercentage + '%',
+          .sort((a, b) => Number(b.CapacityPercentage) - Number(a.CapacityPercentage))
+          .map((row) => ({
+            label: row.EnclosureName,
+            pct: Math.min(100, Number(row.CapacityPercentage) || 0),
+            display: `${row.CapacityPercentage}%`,
           })),
       })}
     >
@@ -392,6 +834,7 @@ export function ProductSalesReport() {
   )
 }
 
+
 export function RevenueReport() {
   const [filters, setFilters] = useState({
     startDate: '',
@@ -429,7 +872,65 @@ export function RevenueReport() {
   ].sort((a, b) => a.localeCompare(b))
 
   return (
-    <div>
+    <ReportPage
+      title="Revenue"
+      description="Analyze zoo revenue by date, payment method, customer, shop, product, and ticket type."
+      insightAsCard
+      filtersInside
+      filters={filters}
+      url="/api/reports/revenue"
+      rowKey={(row) => row.SaleDate + '-' + row.PaymentType}
+      columns={[
+        { key: 'SaleDate', label: 'Date', isDate: true },
+        { key: 'PaymentType', label: 'Payment' },
+        { key: 'SaleCount', label: 'Sales' },
+        { key: 'Revenue', label: 'Revenue', isMoney: true },
+      ]}
+      summarize={(rows) => {
+        const total = rows.reduce((s, r) => s + Number(r.Revenue), 0)
+        const sales = rows.reduce((s, r) => s + Number(r.SaleCount), 0)
+        const card = rows
+          .filter((r) => r.PaymentType === 'Card')
+          .reduce((s, r) => s + Number(r.Revenue), 0)
+        const cash = rows
+          .filter((r) => r.PaymentType === 'Cash')
+          .reduce((s, r) => s + Number(r.Revenue), 0)
+
+        return [
+          { label: 'Total revenue', value: money(total) },
+          { label: 'Transactions', value: sales },
+          { label: 'Card', value: money(card) },
+          { label: 'Cash', value: money(cash) },
+          {
+            insight: total
+              ? `Card is ${Math.round((card / total) * 100) || 0}% of revenue in this window; cash is ${Math.round((cash / total) * 100) || 0}%.`
+              : 'No sales in this filter — widen the date range.',
+          },
+        ]
+      }}
+      bar={(rows) => {
+        const byDate = {}
+        rows.forEach((r) => {
+          const key = String(r.SaleDate).slice(0, 10)
+          byDate[key] = (byDate[key] || 0) + Number(r.Revenue)
+        })
+
+        const items = Object.entries(byDate)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([label, value]) => ({ label, value }))
+
+        const max = Math.max(...items.map((i) => i.value), 1)
+
+        return {
+          title: 'Revenue by day',
+          items: items.map((i) => ({
+            label: i.label,
+            pct: Math.round((i.value * 100) / max),
+            display: money(i.value),
+          })),
+        }
+      }}
+    >
       <FilterBar filters={filters} setFilters={setFilters}>
         <label>
           Payment
@@ -480,21 +981,21 @@ export function RevenueReport() {
         </label>
 
         <label>
-  Product
-  <select
-    value={filters.productName}
-    onChange={(e) =>
-      setFilters({ ...filters, productName: e.target.value })
-    }
-  >
-    <option value="">All products</option>
-    {productNames.map((name) => (
-      <option key={name} value={name}>
-        {name}
-      </option>
-    ))}
-  </select>
-</label>
+          Product
+          <select
+            value={filters.productName}
+            onChange={(e) =>
+              setFilters({ ...filters, productName: e.target.value })
+            }
+          >
+            <option value="">All products</option>
+            {productNames.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <label>
           Ticket Type
@@ -511,66 +1012,10 @@ export function RevenueReport() {
           </select>
         </label>
       </FilterBar>
-
-      <ReportPage
-      title="Revenue"
-      insightAsCard
-        url={buildUrl('/api/reports/revenue', filters)}
-        rowKey={(row) => row.SaleDate + '-' + row.PaymentType}
-        columns={[
-          { key: 'SaleDate', label: 'Date', isDate: true },
-          { key: 'PaymentType', label: 'Payment' },
-          { key: 'SaleCount', label: 'Sales' },
-          { key: 'Revenue', label: 'Revenue', isMoney: true },
-        ]}
-        summarize={(rows) => {
-          const total = rows.reduce((s, r) => s + Number(r.Revenue), 0)
-          const sales = rows.reduce((s, r) => s + Number(r.SaleCount), 0)
-          const card = rows
-            .filter((r) => r.PaymentType === 'Card')
-            .reduce((s, r) => s + Number(r.Revenue), 0)
-          const cash = rows
-            .filter((r) => r.PaymentType === 'Cash')
-            .reduce((s, r) => s + Number(r.Revenue), 0)
-
-          return [
-            { label: 'Total revenue', value: money(total) },
-            { label: 'Transactions', value: sales },
-            { label: 'Card', value: money(card) },
-            { label: 'Cash', value: money(cash) },
-            {
-              insight: total
-                ? `Card is ${Math.round((card / total) * 100) || 0}% of revenue in this window; cash is ${Math.round((cash / total) * 100) || 0}%.`
-                : 'No sales in this filter — widen the date range.',
-            },
-          ]
-        }}
-        bar={(rows) => {
-          const byDate = {}
-          rows.forEach((r) => {
-            const key = String(r.SaleDate).slice(0, 10)
-            byDate[key] = (byDate[key] || 0) + Number(r.Revenue)
-          })
-
-          const items = Object.entries(byDate)
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([label, value]) => ({ label, value }))
-
-          const max = Math.max(...items.map((i) => i.value), 1)
-
-          return {
-            title: 'Revenue by day',
-            items: items.map((i) => ({
-              label: i.label,
-              pct: Math.round((i.value * 100) / max),
-              display: money(i.value),
-            })),
-          }
-        }}
-      />
-    </div>
+    </ReportPage>
   )
 }
+
 
 export function ClosuresReport() {
   const [filters, setFilters] = useState({ startDate: '', endDate: '', scope: '' })
@@ -664,20 +1109,19 @@ export function MostVisitedReport() {
 }
 
 
-export function ZooOperationsReport() {
+export function ZooCapacityReport() {
   return (
     <div>
       <div className="page-card">
-        <h2 style={{ marginTop: 0 }}>Zoo Operations</h2>
+        <h2 style={{ marginTop: 0 }}>Zoo Capacity Report</h2>
         <p style={{ color: 'var(--muted)' }}>
-          Monitor enclosure capacity, visitor traffic, and zoo closures.
-          Generate each report separately to view the latest information.
+          Analyze how effectively the zoo uses its available animal habitats.
+          Review enclosure capacity, animal counts, and available spaces to
+          identify enclosures approaching their limits.
         </p>
       </div>
 
       <OccupancyReport />
-      <MostVisitedReport />
-      <ClosuresReport />
     </div>
   )
 }
