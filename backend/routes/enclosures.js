@@ -43,8 +43,10 @@ async function handleEnclosures(req, res, pathname) {
              WHERE a.EnclosureID = e.EnclosureID
               AND a.IsDeleted = 0
               AND s.IsDeleted = 0
-           ) AS AnimalCount
+           ) AS AnimalCount,
+           COALESCE(o.IsOpenToday, 0) AS IsOpenToday
          FROM enclosure e
+         LEFT JOIN v_enclosure_open_today o ON o.EnclosureID = e.EnclosureID
          WHERE e.IsDeleted = 0
          ORDER BY e.Name`
       );

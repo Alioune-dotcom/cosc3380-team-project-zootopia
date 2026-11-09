@@ -13,6 +13,8 @@ DROP TRIGGER IF EXISTS `trg_animal_sick_quarantine_insert`;
 DROP TRIGGER IF EXISTS `trg_animal_sick_quarantine_update`;
 DROP TRIGGER IF EXISTS `trg_transaction_shop_rules`;
 DROP TRIGGER IF EXISTS `trg_ticket_online_only`;
+DROP TRIGGER IF EXISTS `trg_attraction_rules_insert`;
+DROP TRIGGER IF EXISTS `trg_attraction_rules_update`;
 
 DELIMITER $$
 
@@ -181,7 +183,8 @@ BEGIN
   END IF;
 END$$
 
--- tickets are only sold online
+-- tickets are only sold online, and not on a day the whole zoo is closed
+-- (tickets are for today only)
 CREATE TRIGGER `trg_ticket_online_only`
 BEFORE INSERT ON `ticket`
 FOR EACH ROW
@@ -196,6 +199,92 @@ BEGIN
   IF tx_customer IS NULL THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Tickets can only be sold online.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM `zooclosure`
+    WHERE `Date` = CURDATE() AND `Scope` = 'FullZoo'
+  ) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'The zoo is closed today.';
+  END IF;
+END$$
+
+-- attraction rules (insert): host must be an active zookeeper, and it can't be
+-- scheduled at a closed enclosure or on a day the zoo / that enclosure is closed
+CREATE TRIGGER `trg_attraction_rules_insert`
+BEFORE INSERT ON `attraction`
+FOR EACH ROW
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM `users` u
+    JOIN `employee` e ON e.`EmployeeID` = u.`EmployeeID`
+    WHERE u.`EmployeeID` = NEW.`HostEmployeeID`
+      AND u.`Role` = 'Zookeeper'
+      AND u.`IsDeleted` = 0
+      AND e.`IsDeleted` = 0
+  ) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Host must be an active zookeeper.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM `enclosure`
+    WHERE `EnclosureID` = NEW.`EnclosureID` AND `Status` = 'Closed'
+  ) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'That enclosure is closed.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM `zooclosure` z
+    WHERE z.`Date` = DATE(NEW.`Schedule`)
+      AND (z.`Scope` = 'FullZoo' OR z.`EnclosureID` = NEW.`EnclosureID`)
+  ) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'There is a closure on that day for this enclosure or the whole zoo.';
+  END IF;
+END$$
+
+-- attraction rules (update): same checks, but only when the host, enclosure or
+-- time changes, so removing (soft delete) an attraction still works
+CREATE TRIGGER `trg_attraction_rules_update`
+BEFORE UPDATE ON `attraction`
+FOR EACH ROW
+BEGIN
+  IF NEW.`IsDeleted` = 0 AND NEW.`HostEmployeeID` <> OLD.`HostEmployeeID` AND NOT EXISTS (
+    SELECT 1
+    FROM `users` u
+    JOIN `employee` e ON e.`EmployeeID` = u.`EmployeeID`
+    WHERE u.`EmployeeID` = NEW.`HostEmployeeID`
+      AND u.`Role` = 'Zookeeper'
+      AND u.`IsDeleted` = 0
+      AND e.`IsDeleted` = 0
+  ) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Host must be an active zookeeper.';
+  END IF;
+
+  IF NEW.`IsDeleted` = 0
+     AND (NEW.`EnclosureID` <> OLD.`EnclosureID` OR NEW.`Schedule` <> OLD.`Schedule`)
+  THEN
+    IF EXISTS (
+      SELECT 1 FROM `enclosure`
+      WHERE `EnclosureID` = NEW.`EnclosureID` AND `Status` = 'Closed'
+    ) THEN
+      SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'That enclosure is closed.';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM `zooclosure` z
+      WHERE z.`Date` = DATE(NEW.`Schedule`)
+        AND (z.`Scope` = 'FullZoo' OR z.`EnclosureID` = NEW.`EnclosureID`)
+    ) THEN
+      SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'There is a closure on that day for this enclosure or the whole zoo.';
+    END IF;
   END IF;
 END$$
 

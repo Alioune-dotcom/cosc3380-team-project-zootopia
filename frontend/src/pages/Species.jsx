@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react'
 import DataTable from '../components/DataTable.jsx'
+import { CONSERVATION_STATUSES } from '../options.js'
 
 // species page: list + add / edit / delete
 // uses /api/species
@@ -221,12 +222,17 @@ function Species() {
         />
 
         <label>Conservation Status</label>
-        <input
+        <select
           name="ConservationStatus"
           value={form.ConservationStatus}
           onChange={handleChange}
           required
-        />
+        >
+          <option value="">-- pick one --</option>
+          {CONSERVATION_STATUSES.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
 
         <label>Average Lifespan (years)</label>
         <input

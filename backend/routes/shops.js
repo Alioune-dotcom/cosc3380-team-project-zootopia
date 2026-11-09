@@ -26,6 +26,17 @@ function readBody(req) {
 }
 
 const SHOP_TYPES = ["Gift", "Food", "Online"];
+// physical locations in the zoo (same list as enclosures); the online store is always "Online"
+const LOCATIONS = ["Zone A", "Zone B", "Zone C", "Main Plaza", "Vet Wing"];
+
+// the online store's location is fixed; everything else picks from LOCATIONS
+function fixLocation(shopType, location) {
+  if (shopType === "Online") return { location: "Online" };
+  if (!LOCATIONS.includes(location)) {
+    return { error: "Location must be one of: " + LOCATIONS.join(", ") };
+  }
+  return { location };
+}
 
 // only one online store is allowed; returns an error message or null
 async function checkShopType(shopType, currentShopId) {
@@ -92,7 +103,7 @@ async function handleShops(req, res, pathname) {
       const body = await readBody(req);
       const { Name, Location, ShopType } = body;
 
-      if (!Name || !Location || !ShopType) {
+      if (!Name || !ShopType || (!Location && ShopType !== "Online")) {
         return sendJson(res, 400, { error: "Missing required fields" });
       }
 
@@ -101,9 +112,14 @@ async function handleShops(req, res, pathname) {
         return sendJson(res, 400, { error: typeError });
       }
 
+      const loc = fixLocation(ShopType, Location);
+      if (loc.error) {
+        return sendJson(res, 400, { error: loc.error });
+      }
+
       const [result] = await pool.query(
         "INSERT INTO shop (Name, Location, ShopType) VALUES (?, ?, ?)",
-        [Name, Location, ShopType]
+        [Name, loc.location, ShopType]
       );
 
       return sendJson(res, 201, { ShopID: result.insertId });
@@ -119,7 +135,7 @@ async function handleShops(req, res, pathname) {
       const body = await readBody(req);
       const { Name, Location, ShopType } = body;
 
-      if (!Name || !Location || !ShopType) {
+      if (!Name || !ShopType || (!Location && ShopType !== "Online")) {
         return sendJson(res, 400, { error: "Missing required fields" });
       }
 
@@ -128,11 +144,16 @@ async function handleShops(req, res, pathname) {
         return sendJson(res, 400, { error: typeError });
       }
 
+      const loc = fixLocation(ShopType, Location);
+      if (loc.error) {
+        return sendJson(res, 400, { error: loc.error });
+      }
+
       const [result] = await pool.query(
         `UPDATE shop
          SET Name = ?, Location = ?, ShopType = ?
          WHERE ShopID = ? AND IsDeleted = 0`,
-        [Name, Location, ShopType, id]
+        [Name, loc.location, ShopType, id]
       );
 
       if (result.affectedRows === 0) {

@@ -65,13 +65,13 @@ CREATE TABLE `attraction` (
   `Schedule` datetime NOT NULL,
   `DurationMinutes` int DEFAULT NULL,
   `EnclosureID` int NOT NULL,
-  `HostEmployeeID` int DEFAULT NULL,
+  `HostEmployeeID` int NOT NULL,
   `IsDeleted` tinyint NOT NULL DEFAULT 0,
   PRIMARY KEY (`AttractionID`),
   KEY `EnclosureID` (`EnclosureID`),
   KEY `HostEmployeeID` (`HostEmployeeID`),
   CONSTRAINT `attraction_ibfk_1` FOREIGN KEY (`EnclosureID`) REFERENCES `enclosure` (`EnclosureID`),
-  -- zookeeper who hosts the talk/show (optional)
+  -- zookeeper who hosts the talk/show (required; trigger checks they're a zookeeper)
   CONSTRAINT `attraction_ibfk_2` FOREIGN KEY (`HostEmployeeID`) REFERENCES `employee` (`EmployeeID`),
   CONSTRAINT `attraction_chk_duration` CHECK ((`DurationMinutes` IS NULL OR `DurationMinutes` > 0)),
   CONSTRAINT `attraction_chk_deleted` CHECK ((`IsDeleted` IN (0,1)))
@@ -180,6 +180,11 @@ CREATE TABLE `enclosure` (
   PRIMARY KEY (`EnclosureID`),
   CONSTRAINT `enclosure_chk_1` CHECK ((`Capacity` > 0)),
   CONSTRAINT `enclosure_chk_2` CHECK ((`Status` IN ('Open','Closed'))),
+  -- dropdown lists in the app match these
+  CONSTRAINT `enclosure_chk_habitat` CHECK ((`HabitatType` IN (
+    'Savanna','Grassland','Aquatic','Rainforest','Desert','Arctic','Forest','Aviary','Reptile House','Medical'
+  ))),
+  CONSTRAINT `enclosure_chk_location` CHECK ((`Location` IN ('Zone A','Zone B','Zone C','Main Plaza','Vet Wing'))),
   CONSTRAINT `enclosure_chk_deleted` CHECK ((`IsDeleted` IN (0,1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -209,6 +214,8 @@ CREATE TABLE `product` (
   CONSTRAINT `product_ibfk_1` FOREIGN KEY (`ShopID`) REFERENCES `shop` (`ShopID`),
   CONSTRAINT `product_chk_1` CHECK ((`Price` >= 0)),
   CONSTRAINT `product_chk_2` CHECK ((`QuantityInStock` >= 0)),
+  -- Food/Drink for food stands, Merchandise/Apparel for gift + online (checked in the backend)
+  CONSTRAINT `product_chk_category` CHECK ((`Category` IN ('Food','Drink','Merchandise','Apparel'))),
   CONSTRAINT `product_chk_deleted` CHECK ((`IsDeleted` IN (0,1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -234,6 +241,9 @@ CREATE TABLE `shop` (
   PRIMARY KEY (`ShopID`),
   -- Online = the online store (its own stock, like a warehouse)
   CONSTRAINT `shop_chk_1` CHECK ((`ShopType` IN ('Gift','Food','Online'))),
+  CONSTRAINT `shop_chk_location` CHECK ((`Location` IN ('Zone A','Zone B','Zone C','Main Plaza','Vet Wing','Online'))),
+  -- only the online store has location 'Online'
+  CONSTRAINT `shop_chk_online_location` CHECK (((`ShopType` = 'Online') = (`Location` = 'Online'))),
   CONSTRAINT `shop_chk_deleted` CHECK ((`IsDeleted` IN (0,1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -260,6 +270,10 @@ CREATE TABLE `species` (
   `IsDeleted` tinyint NOT NULL DEFAULT 0,
   PRIMARY KEY (`SpeciesID`),
   UNIQUE KEY `ScientificName` (`ScientificName`),
+  -- IUCN Red List categories
+  CONSTRAINT `species_chk_conservation` CHECK ((`ConservationStatus` IN (
+    'Least Concern','Near Threatened','Vulnerable','Endangered','Critically Endangered','Extinct in the Wild','Data Deficient'
+  ))),
   CONSTRAINT `species_chk_deleted` CHECK ((`IsDeleted` IN (0,1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

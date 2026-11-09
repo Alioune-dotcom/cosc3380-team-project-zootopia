@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
 import DataTable from '../components/DataTable.jsx'
 
-const EMPTY_FORM = {
-  Email: '',
-  Username: '',
-  Password: '',
-}
+// manager page: view customers and deactivate accounts
+// customers create their own accounts on the Sign up page, so there's no "add customer" here
+// deactivate = soft delete (IsDeleted = 1), so their past purchases stay in reports
 
 const COLUMNS = [
   { key: 'CustomerID', label: 'ID' },
@@ -17,8 +15,6 @@ const COLUMNS = [
 
 function Customers() {
   const [rows, setRows] = useState([])
-  const [form, setForm] = useState(EMPTY_FORM)
-  const [editingId, setEditingId] = useState(null)
   const [message, setMessage] = useState(null)
 
   async function load() {
@@ -34,54 +30,8 @@ function Customers() {
     load()
   }, [])
 
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value })
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-
-    if (!form.Email) {
-      setMessage({ type: 'error', text: 'Email is required' })
-      return
-    }
-
-    if (!editingId && (!form.Username || !form.Password)) {
-      setMessage({ type: 'error', text: 'Username and password required for new customers' })
-      return
-    }
-
-    const url = editingId ? '/api/customers/' + editingId : '/api/customers'
-    const method = editingId ? 'PUT' : 'POST'
-
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        setMessage({ type: 'error', text: data.error })
-        return
-      }
-      setMessage({ type: 'success', text: editingId ? 'Customer updated' : 'Customer added' })
-      setForm(EMPTY_FORM)
-      setEditingId(null)
-      load()
-    } catch (err) {
-      setMessage({ type: 'error', text: 'Could not connect to the server' })
-    }
-  }
-
-  function handleEdit(row) {
-    setForm({ Email: row.Email, Username: row.Username || '', Password: '' })
-    setEditingId(row.CustomerID)
-    setMessage(null)
-  }
-
-  async function handleDelete(row) {
-    if (!window.confirm('Delete customer ' + row.Email + '?')) return
+  async function handleDeactivate(row) {
+    if (!window.confirm('Deactivate ' + row.Email + '? They will no longer be able to log in.')) return
     try {
       const response = await fetch('/api/customers/' + row.CustomerID, { method: 'DELETE' })
       const data = await response.json()
@@ -89,7 +39,7 @@ function Customers() {
         setMessage({ type: 'error', text: data.error })
         return
       }
-      setMessage({ type: 'success', text: 'Customer deleted' })
+      setMessage({ type: 'success', text: row.Email + ' deactivated' })
       load()
     } catch (err) {
       setMessage({ type: 'error', text: 'Could not connect to the server' })
@@ -99,45 +49,17 @@ function Customers() {
   return (
     <div>
       <h2>Customers</h2>
+      <p style={{ color: 'var(--muted)' }}>
+        Customers create their own accounts online. You can view them and deactivate accounts.
+      </p>
       {message ? <p className={'message ' + message.type}>{message.text}</p> : null}
-
-      <form className="data-form" onSubmit={handleSubmit}>
-        <h3>{editingId ? 'Edit customer #' + editingId : 'Add customer'}</h3>
-        <label>Email</label>
-        <input name="Email" value={form.Email} onChange={handleChange} />
-        {!editingId ? (
-          <>
-            <label>Username</label>
-            <input name="Username" value={form.Username} onChange={handleChange} />
-            <label>Password</label>
-            <input name="Password" type="password" value={form.Password} onChange={handleChange} />
-          </>
-        ) : null}
-        <div className="form-buttons">
-          <button type="submit">{editingId ? 'Save changes' : 'Add customer'}</button>
-          {editingId ? (
-            <button
-              type="button"
-              onClick={() => {
-                setForm(EMPTY_FORM)
-                setEditingId(null)
-              }}
-            >
-              Cancel
-            </button>
-          ) : null}
-        </div>
-      </form>
 
       <DataTable
         columns={COLUMNS}
         rows={rows}
         rowKey="CustomerID"
         actions={(row) => (
-          <>
-            <button onClick={() => handleEdit(row)}>Edit</button>
-            <button onClick={() => handleDelete(row)}>Delete</button>
-          </>
+          <button onClick={() => handleDeactivate(row)}>Deactivate</button>
         )}
       />
     </div>

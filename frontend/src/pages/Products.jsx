@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import DataTable from '../components/DataTable.jsx'
+import { CATEGORIES_BY_SHOP_TYPE } from '../options.js'
 
-// products page: list + add / edit / delete
-// uses /api/products and /api/shops
+// products page
+// manager: list + add / edit / delete every product
+// cashier: read-only list of products in the shops they're assigned to
+// uses /api/products and /api/shops (or /api/employees/:id/shops for cashiers)
 
 // blank form. names match what the backend expects
 const EMPTY_FORM = {
@@ -23,6 +26,9 @@ const COLUMNS = [
 ]
 
 function Products() {
+  const user = JSON.parse(localStorage.getItem('user') || 'null')
+  const isManager = user?.role === 'Manager'
+
   const [products, setProducts] = useState([])
   const [shops, setShops] = useState([])
   const [form, setForm] = useState(EMPTY_FORM)
@@ -41,8 +47,11 @@ function Products() {
   // runs once when the page opens
   useEffect(() => {
     async function loadShops() {
-      const response = await fetch('/api/shops')
-      setShops(await response.json())
+      // cashiers only get the shops they're assigned to
+      const url = isManager ? '/api/shops' : '/api/employees/' + user?.employeeId + '/shops'
+      const response = await fetch(url)
+      const data = await response.json()
+      setShops(Array.isArray(data) ? data : [])
     }
     loadProducts()
     loadShops()
@@ -55,10 +64,26 @@ function Products() {
   }
 
   // same products, plus a ShopName field for the table
-  const rows = products.map((p) => ({ ...p, ShopName: shopName(p.ShopID) }))
+  // cashiers only see products from their own shops
+  const visibleProducts = isManager
+    ? products
+    : products.filter((p) => shops.some((s) => s.ShopID === p.ShopID))
+  const rows = visibleProducts.map((p) => ({ ...p, ShopName: shopName(p.ShopID) }))
+
+  // category options depend on the picked shop's type (Food vs Gift/Online)
+  const pickedShop = shops.find((s) => String(s.ShopID) === String(form.ShopID))
+  const categoryOptions = pickedShop ? CATEGORIES_BY_SHOP_TYPE[pickedShop.ShopType] || [] : []
 
   function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    if (name === 'ShopID') {
+      // clear the category if it doesn't fit the new shop
+      const shop = shops.find((s) => String(s.ShopID) === String(value))
+      const allowed = shop ? CATEGORIES_BY_SHOP_TYPE[shop.ShopType] || [] : []
+      setForm({ ...form, ShopID: value, Category: allowed.includes(form.Category) ? form.Category : '' })
+      return
+    }
+    setForm({ ...form, [name]: value })
   }
 
   async function handleSubmit(e) {
@@ -143,6 +168,11 @@ function Products() {
 
       {message ? <p className={'message ' + message.type}>{message.text}</p> : null}
 
+      {!isManager ? (
+        <p style={{ color: 'var(--muted)' }}>Products in the shops you work at. Only managers can change products.</p>
+      ) : null}
+
+      {isManager ? (
       <form className="data-form" onSubmit={handleSubmit}>
         <h3>{editingId ? 'Edit product #' + editingId : 'Add a product'}</h3>
 
@@ -151,9 +181,6 @@ function Products() {
 
         <label>Price</label>
         <input type="number" step="0.01" min="0" name="Price" value={form.Price} onChange={handleChange} />
-
-        <label>Category</label>
-        <input name="Category" value={form.Category} onChange={handleChange} />
 
         <label>Quantity in stock</label>
         <input type="number" min="0" name="QuantityInStock" value={form.QuantityInStock} onChange={handleChange} />
@@ -166,22 +193,31 @@ function Products() {
           ))}
         </select>
 
+        <label>Category</label>
+        <select name="Category" value={form.Category} onChange={handleChange} disabled={!pickedShop}>
+          <option value="">{pickedShop ? '-- pick one --' : '-- pick a shop first --'}</option>
+          {categoryOptions.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+
         <div className="form-buttons">
           <button type="submit">{editingId ? 'Save changes' : 'Add product'}</button>
           {editingId ? <button type="button" onClick={handleCancel}>Cancel</button> : null}
         </div>
       </form>
+      ) : null}
 
       <DataTable
         columns={COLUMNS}
         rows={rows}
         rowKey="ProductID"
-        actions={(row) => (
+        actions={isManager ? (row) => (
           <>
             <button onClick={() => handleEdit(row)}>Edit</button>
             <button onClick={() => handleDelete(row)}>Delete</button>
           </>
-        )}
+        ) : null}
       />
     </div>
   )

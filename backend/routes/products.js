@@ -25,6 +25,27 @@ function readBody(req) {
   });
 }
 
+// which categories each shop type can sell (dropdown in the app matches this)
+const CATEGORIES_BY_SHOP_TYPE = {
+  Food: ["Food", "Drink"],
+  Gift: ["Merchandise", "Apparel"],
+  Online: ["Merchandise", "Apparel"]
+};
+
+// returns an error message, or null if the category fits the shop
+async function checkCategory(category, shopId) {
+  const [rows] = await pool.query(
+    "SELECT ShopType FROM shop WHERE ShopID = ? AND IsDeleted = 0",
+    [shopId]
+  );
+  if (rows.length === 0) return "Shop not found";
+  const allowed = CATEGORIES_BY_SHOP_TYPE[rows[0].ShopType] || [];
+  if (!allowed.includes(category)) {
+    return rows[0].ShopType + " shops can only sell: " + allowed.join(", ");
+  }
+  return null;
+}
+
 async function handleProducts(req, res, pathname) {
   // /api/products or /api/products/1
   const parts = pathname.split("/").filter(Boolean);
@@ -124,6 +145,11 @@ async function handleProducts(req, res, pathname) {
         return sendJson(res, 400, { error: "Missing required fields" });
       }
 
+      const categoryError = await checkCategory(Category, ShopID);
+      if (categoryError) {
+        return sendJson(res, 400, { error: categoryError });
+      }
+
       const [result] = await pool.query(
         `INSERT INTO product (Name, Price, Category, QuantityInStock, ShopID)
          VALUES (?, ?, ?, ?, ?)`,
@@ -142,6 +168,15 @@ async function handleProducts(req, res, pathname) {
     try {
       const body = await readBody(req);
       const { Name, Price, Category, QuantityInStock, ShopID } = body;
+
+      if (!Name || Price == null || !Category || QuantityInStock == null || !ShopID) {
+        return sendJson(res, 400, { error: "Missing required fields" });
+      }
+
+      const categoryError = await checkCategory(Category, ShopID);
+      if (categoryError) {
+        return sendJson(res, 400, { error: categoryError });
+      }
 
       const [result] = await pool.query(
         `UPDATE product
