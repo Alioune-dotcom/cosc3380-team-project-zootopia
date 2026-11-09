@@ -327,7 +327,6 @@ export function AnimalPopulationReport() {
 
 
 
-
 export function VisitorActivityReport() {
   const emptyFilters = {
     startDate: '',
@@ -338,7 +337,6 @@ export function VisitorActivityReport() {
   }
 
   const [filters, setFilters] = useState(emptyFilters)
-  const [appliedFilters, setAppliedFilters] = useState(emptyFilters)
   const [enclosures, setEnclosures] = useState([])
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -379,7 +377,6 @@ export function VisitorActivityReport() {
       }
 
       setData(result)
-      setAppliedFilters({ ...selectedFilters })
     } catch (err) {
       setError(err.message || 'Could not connect to the server')
       setData(null)
@@ -399,19 +396,6 @@ export function VisitorActivityReport() {
   const summary = data?.summary
   const ticketRows = data?.ticketPopularity || []
   const visitRows = data?.plannedVisits || []
-
-  // Determine which report sections should be displayed.
-  const hasTicketFilter = Boolean(appliedFilters.ticketType)
-
-  const hasPlannedVisitFilter = Boolean(
-    appliedFilters.enclosureId || appliedFilters.habitatType
-  )
-
-  // Ticket filters hide planned visit reports.
-  // Planned visit filters hide ticket reports.
-  // If neither is selected, display both.
-  const showTicketReport = !hasPlannedVisitFilter
-  const showPlannedVisitReport = !hasTicketFilter
 
   return (
     <div>
@@ -552,108 +536,91 @@ export function VisitorActivityReport() {
 
       {data && !loading && !error ? (
         <>
-          {/* Summary Statistics */}
           <div className="kpi-row">
+            <div className="stat-box">
+              <strong>{Number(summary?.TotalTicketsSold || 0)}</strong>
+              <span>Tickets sold</span>
+            </div>
 
-            {showTicketReport && (
-              <>
-                <div className="stat-box">
-                  <strong>{Number(summary?.TotalTicketsSold || 0)}</strong>
-                  <span>Tickets sold</span>
-                </div>
+            <div className="stat-box">
+              <strong>{summary?.MostPopularTicketType || '—'}</strong>
+              <span>Most popular ticket</span>
+            </div>
 
-                <div className="stat-box">
-                  <strong>{summary?.MostPopularTicketType || '—'}</strong>
-                  <span>Most popular ticket</span>
-                </div>
+            <div className="stat-box">
+              <strong>{Number(summary?.UniqueCustomers || 0)}</strong>
+              <span>Unique customers</span>
+            </div>
 
-                <div className="stat-box">
-                  <strong>{Number(summary?.UniqueCustomers || 0)}</strong>
-                  <span>Unique customers</span>
-                </div>
-              </>
-            )}
+            <div className="stat-box">
+              <strong>{Number(summary?.TotalPlannedVisits || 0)}</strong>
+              <span>Planned enclosure visits</span>
+            </div>
 
-            {showPlannedVisitReport && (
-              <>
-                <div className="stat-box">
-                  <strong>{Number(summary?.TotalPlannedVisits || 0)}</strong>
-                  <span>Planned enclosure visits</span>
-                </div>
-
-                <div className="stat-box">
-                  <strong>{summary?.MostPopularEnclosure || '—'}</strong>
-                  <span>Most popular enclosure</span>
-                </div>
-              </>
-            )}
-
+            <div className="stat-box">
+              <strong>{summary?.MostPopularEnclosure || '—'}</strong>
+              <span>Most popular enclosure</span>
+            </div>
           </div>
 
-          {/* Ticket Popularity Report */}
-          {showTicketReport && (
-            <div className="page-card">
-              <h3 style={{ marginTop: 0 }}>Ticket Popularity</h3>
+          <div className="page-card">
+            <h3 style={{ marginTop: 0 }}>Ticket popularity</h3>
 
-              {ticketRows.length > 0 ? (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Ticket type</th>
-                      <th>Tickets sold</th>
+            {ticketRows.length > 0 ? (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ticket type</th>
+                    <th>Tickets sold</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ticketRows.map((row) => (
+                    <tr key={row.TicketType}>
+                      <td>{row.TicketType}</td>
+                      <td>{Number(row.TicketsSold)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {ticketRows.map((row) => (
-                      <tr key={row.TicketType}>
-                        <td>{row.TicketType}</td>
-                        <td>{Number(row.TicketsSold)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p>No ticket sales found for these filters.</p>
-              )}
-            </div>
-          )}
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No ticket sales found for these filters.</p>
+            )}
+          </div>
 
-          {/* Planned Enclosure Visits Report */}
-          {showPlannedVisitReport && (
-            <div className="page-card">
-              <h3 style={{ marginTop: 0 }}>Planned Enclosure Visits</h3>
-              <p style={{ color: 'var(--muted)' }}>
-                Shows the enclosures customers selected during checkout.
-              </p>
+          <div className="page-card">
+            <h3 style={{ marginTop: 0 }}>Planned enclosure visits</h3>
+            <p style={{ color: 'var(--muted)' }}>
+              Shows the enclosures customers selected during checkout.
+            </p>
 
-              {visitRows.length > 0 ? (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Enclosure</th>
-                      <th>Location</th>
-                      <th>Habitat type</th>
-                      <th>Planned visits</th>
-                      <th>Unique customers</th>
+            {visitRows.length > 0 ? (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Enclosure</th>
+                    <th>Location</th>
+                    <th>Habitat type</th>
+                    <th>Planned visits</th>
+                    <th>Unique customers</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visitRows.map((row) => (
+                    <tr key={row.EnclosureID}>
+                      <td>{row.EnclosureName}</td>
+                      <td>{row.Location || '—'}</td>
+                      <td>{row.HabitatType || '—'}</td>
+                      <td>{Number(row.VisitCount)}</td>
+                      <td>{Number(row.UniqueCustomers)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {visitRows.map((row) => (
-                      <tr key={row.EnclosureID}>
-                        <td>{row.EnclosureName}</td>
-                        <td>{row.Location || '—'}</td>
-                        <td>{row.HabitatType || '—'}</td>
-                        <td>{Number(row.VisitCount)}</td>
-                        <td>{Number(row.UniqueCustomers)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p>No planned enclosure visits found for these filters.</p>
-              )}
-            </div>
-          )}
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No planned enclosure visits found for these filters.</p>
+            )}
+          </div>
         </>
       ) : null}
     </div>
