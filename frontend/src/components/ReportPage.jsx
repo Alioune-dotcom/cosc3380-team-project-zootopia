@@ -15,13 +15,14 @@ function ReportPage({
   children,
   insightAsCard = false,
   filtersInside = false,
+  onClearFilters,
 }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasGenerated, setHasGenerated] = useState(false)
 
-  async function generateReport() {
+  async function generateReport(selectedFilters = filters) {
     setLoading(true)
     setError('')
     setHasGenerated(true)
@@ -29,7 +30,7 @@ function ReportPage({
     try {
       const params = new URLSearchParams()
 
-      Object.entries(filters || {}).forEach(([key, value]) => {
+      Object.entries(selectedFilters || {}).forEach(([key, value]) => {
         if (value) params.set(key, value)
       })
 
@@ -74,19 +75,33 @@ function ReportPage({
         <p style={{ color: 'var(--muted)' }}>{description}</p>
 
         {filtersInside ? children : null}
-        
-        <p style={{ color: 'var(--muted)', fontSize: 14 }}>
-          Set any filters (optional), then generate.
-        </p>
 
-        <button
-          type="button"
-          className="gold"
-          onClick={generateReport}
-          disabled={loading}
-        >
-          {loading ? 'Generating…' : hasGenerated ? 'Regenerate report' : 'Generate report'}
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            type="button"
+            className="gold"
+            onClick={() => generateReport()}
+            disabled={loading}
+          >
+            {loading ? 'Generating…' : hasGenerated ? 'Regenerate report' : 'Generate report'}
+          </button>
+
+          {onClearFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                const clearedFilters = onClearFilters()
+
+                if (hasGenerated) {
+                  generateReport(clearedFilters)
+                }
+              }}
+              disabled={loading}
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
       </div>
 
       {error ? <p className="message error">{error}</p> : null}
@@ -104,7 +119,7 @@ function ReportPage({
           ) : null}
 
           {kpis.filter((k) => k.label).length > 0 ||
-            insightAsCard && insight ? (
+            (insightAsCard && insight) ? (
             <div className="kpi-row">
               {kpis.filter((k) => k.label).map((k) => (
                 <div key={k.label} className="stat-box">

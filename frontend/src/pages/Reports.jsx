@@ -834,7 +834,7 @@ export function ProductSalesReport() {
 
 
 export function RevenueReport() {
-  const [filters, setFilters] = useState({
+  const emptyFilters = {
     startDate: '',
     endDate: '',
     paymentType: '',
@@ -842,11 +842,16 @@ export function RevenueReport() {
     shopId: '',
     productName: '',
     ticketType: '',
-  })
-
+  }
+  const [filters, setFilters] = useState(emptyFilters)
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
   const [shops, setShops] = useState([])
+
+  function clearFilters() {
+    setFilters(emptyFilters)
+    return emptyFilters
+  }
 
   useEffect(() => {
     fetch('/api/customers')
@@ -876,6 +881,7 @@ export function RevenueReport() {
       insightAsCard
       filtersInside
       filters={filters}
+      onClearFilters={clearFilters}
       url="/api/reports/revenue"
       rowKey={(row) => row.SaleDate + '-' + row.PaymentType}
       columns={[
