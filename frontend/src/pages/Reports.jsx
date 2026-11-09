@@ -22,8 +22,6 @@ function FilterBar({ filters, setFilters, children }) {
         />
       </label>
       {children}
-      <span style={{ fontSize: 13, color: 'var(--muted)', alignSelf: 'center' }}>
-      </span>
     </div>
   )
 }
@@ -1105,50 +1103,5 @@ export function MostVisitedReport() {
         })}
       />
     </div>
-  )
-}
-
-
-export function ZooCapacityReport() {
-  return (
-    <div>
-      <div className="page-card">
-        <h2 style={{ marginTop: 0 }}>Zoo Capacity Report</h2>
-        <p style={{ color: 'var(--muted)' }}>
-          Analyze how effectively the zoo uses its available animal habitats.
-          Review enclosure capacity, animal counts, and available spaces to
-          identify enclosures approaching their limits.
-        </p>
-      </div>
-
-      <OccupancyReport />
-    </div>
-  )
-}
-
-
-export function OperationsReports() {
-  return (
-    <ReportCategory
-      title="Operations Reports"
-      description="Monitor animal habitats, visitor traffic, and zoo closures."
-      options={[
-        {
-          value: 'occupancy',
-          label: 'Enclosure Occupancy',
-          component: OccupancyReport,
-        },
-        {
-          value: 'most-visited',
-          label: 'Most Visited Habitats',
-          component: MostVisitedReport,
-        },
-        {
-          value: 'closures',
-          label: 'Closures Impact',
-          component: ClosuresReport,
-        },
-      ]}
-    />
   )
 }

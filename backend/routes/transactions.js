@@ -10,7 +10,7 @@ async function loadTransactionDetail(transactionId, customerId) {
     `SELECT
        t.TransactionID,
        t.CustomerID,
-       t.Date,
+       DATE_FORMAT(t.Date, '%Y-%m-%dT%H:%i:%s.000Z') AS Date,
        t.PaymentType,
        COALESCE(vt.TotalAmount, 0) AS TotalAmount
      FROM \`transaction\` t
@@ -70,6 +70,7 @@ async function loadTransactionDetail(transactionId, customerId) {
 async function handleTransactions(req, res, pathname) {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   const parts = pathname.split("/").filter(Boolean);
+
   // /api/my/transactions or /api/my/transactions/:id
   const detailId = parts[3];
 
@@ -77,14 +78,17 @@ async function handleTransactions(req, res, pathname) {
   if (req.method === "GET" && detailId) {
     try {
       const customerId = url.searchParams.get("customerId");
+
       if (!customerId) {
         return sendJson(res, 400, { error: "customerId is required" });
       }
 
       const detail = await loadTransactionDetail(detailId, customerId);
+
       if (!detail) {
         return sendJson(res, 404, { error: "Transaction not found" });
       }
+
       return sendJson(res, 200, detail);
     } catch (error) {
       console.error(error.message);
@@ -105,7 +109,7 @@ async function handleTransactions(req, res, pathname) {
         `SELECT
            t.TransactionID,
            t.CustomerID,
-           t.Date,
+           DATE_FORMAT(t.Date, '%Y-%m-%dT%H:%i:%s.000Z') AS Date,
            t.PaymentType,
            COALESCE(vt.TotalAmount, 0) AS TotalAmount,
            (

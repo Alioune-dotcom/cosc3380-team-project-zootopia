@@ -37,7 +37,16 @@ function TransactionDetail({ customerId, transactionId }) {
       <div className="page-card">
         <h1>Order #{order.transactionId}</h1>
         <p>
-          {String(order.date).slice(0, 19).replace('T', ' ')} · Paid with{' '}
+          {new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Chicago',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+          }).format(new Date(order.date))} · Paid with{' '}
           <strong>{order.paymentType}</strong>
         </p>
         <div className="kpi-row">
@@ -57,10 +66,10 @@ function TransactionDetail({ customerId, transactionId }) {
       </div>
 
       {order.tickets.length > 0 ? (
-      <div className="page-card">
-        <h3>Your tickets</h3>
-        <p>Each line is a ticket type on this order — quantity shows how many you bought.</p>
-        {order.tickets.map((t) => (
+        <div className="page-card">
+          <h3>Your tickets</h3>
+          <p>Each line is a ticket type on this order — quantity shows how many you bought.</p>
+          {order.tickets.map((t) => (
             <div key={t.TicketID} className="ticket-pass">
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
                 <div>
@@ -76,13 +85,13 @@ function TransactionDetail({ customerId, transactionId }) {
                 ${Number(t.UnitPrice).toFixed(2)} each
               </div>
             </div>
-        ))}
-      </div>
+          ))}
+        </div>
       ) : null}
 
       {order.products.length > 0 ? (
-      <div className="page-card">
-        <h3>Shop items</h3>
+        <div className="page-card">
+          <h3>Shop items</h3>
           <table className="data-table">
             <thead>
               <tr>
@@ -103,7 +112,7 @@ function TransactionDetail({ customerId, transactionId }) {
               ))}
             </tbody>
           </table>
-      </div>
+        </div>
       ) : null}
 
       {order.enclosures.length > 0 ? (
@@ -152,18 +161,18 @@ function TransactionList({ customer }) {
       {orders.length === 0 && !error ? (
         <div className="page-card">
           <p>No purchases yet.</p>
-<div className="form-buttons">
-  <Link className="btn gold" to="/checkout">Buy tickets</Link>
-  <Link className="btn secondary" to="/shop">Visit the online shop</Link>
-</div>
+          <div className="form-buttons">
+            <Link className="btn gold" to="/checkout">Buy tickets</Link>
+            <Link className="btn secondary" to="/shop">Visit the online shop</Link>
+          </div>
         </div>
       ) : (
         <table className="data-table">
           <thead>
             <tr>
               <th>Date</th>
-<th>Tickets</th>
-<th>Shop items</th>
+              <th>Tickets</th>
+              <th>Shop items</th>
               <th>Payment</th>
               <th>Total</th>
               <th>Details</th>
@@ -172,9 +181,16 @@ function TransactionList({ customer }) {
           <tbody>
             {orders.map((order) => (
               <tr key={order.transactionId}>
-                <td>{String(order.date).slice(0, 10)}</td>
-<td><strong>{order.ticketCount}</strong></td>
-<td><strong>{order.productCount}</strong></td>
+                <td>
+                  {new Intl.DateTimeFormat('en-US', {
+                    timeZone: 'America/Chicago',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                  }).format(new Date(order.date))}
+                </td>
+                <td><strong>{order.ticketCount}</strong></td>
+                <td><strong>{order.productCount}</strong></td>
                 <td>{order.paymentType}</td>
                 <td>${Number(order.totalAmount).toFixed(2)}</td>
                 <td>

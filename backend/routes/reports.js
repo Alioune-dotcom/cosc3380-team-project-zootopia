@@ -66,12 +66,30 @@ async function handleReports(req, res, pathname) {
       const params = [];
 
       if (filters.startDate) {
-        sql += " AND (t.Date IS NULL OR DATE(t.Date) >= ?)";
+        sql += `
+    AND (
+      t.Date IS NULL
+      OR t.Date >= CONVERT_TZ(
+        CONCAT(?, ' 00:00:00'),
+        'America/Chicago',
+        '+00:00'
+      )
+    )
+  `;
         params.push(filters.startDate);
       }
 
       if (filters.endDate) {
-        sql += " AND (t.Date IS NULL OR DATE(t.Date) <= ?)";
+        sql += `
+    AND (
+      t.Date IS NULL
+      OR t.Date < CONVERT_TZ(
+        DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY),
+        'America/Chicago',
+        '+00:00'
+      )
+    )
+  `;
         params.push(filters.endDate);
       }
 
@@ -117,12 +135,24 @@ async function handleReports(req, res, pathname) {
       const params = [];
 
       if (filters.startDate) {
-        sql += " AND DATE(vt.Date) >= ?";
+        sql += `
+    AND vt.Date >= CONVERT_TZ(
+      CONCAT(?, ' 00:00:00'),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         params.push(filters.startDate);
       }
 
       if (filters.endDate) {
-        sql += " AND DATE(vt.Date) <= ?";
+        sql += `
+    AND vt.Date < CONVERT_TZ(
+      DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         params.push(filters.endDate);
       }
 
@@ -195,10 +225,10 @@ async function handleReports(req, res, pathname) {
 
       let sql = `
         SELECT
-          DATE(t.Date) AS SaleDate,
-          t.PaymentType,
-          COUNT(DISTINCT t.TransactionID) AS SaleCount,
-          COALESCE(SUM(${productRevenue} + ${ticketRevenue}), 0) AS Revenue
+        DATE(CONVERT_TZ(t.Date, '+00:00', 'America/Chicago')) AS SaleDate,
+        t.PaymentType,
+        COUNT(DISTINCT t.TransactionID) AS SaleCount,
+        COALESCE(SUM(${productRevenue} + ${ticketRevenue}), 0) AS Revenue
         FROM \`transaction\` t
         WHERE 1=1
       `;
@@ -210,12 +240,24 @@ async function handleReports(req, res, pathname) {
       if (ticketType) params.push(ticketType);
 
       if (filters.startDate) {
-        sql += " AND DATE(t.Date) >= ?";
+        sql += `
+    AND t.Date >= CONVERT_TZ(
+      CONCAT(?, ' 00:00:00'),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         params.push(filters.startDate);
       }
 
       if (filters.endDate) {
-        sql += " AND DATE(t.Date) <= ?";
+        sql += `
+    AND t.Date < CONVERT_TZ(
+      DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         params.push(filters.endDate);
       }
 
@@ -271,7 +313,9 @@ async function handleReports(req, res, pathname) {
       }
 
       sql += `
-        GROUP BY DATE(t.Date), t.PaymentType
+        GROUP BY
+        DATE(CONVERT_TZ(t.Date, '+00:00', 'America/Chicago')),
+        t.PaymentType
         ORDER BY SaleDate DESC
       `;
 
@@ -347,12 +391,24 @@ async function handleReports(req, res, pathname) {
       const ticketParams = [];
 
       if (filters.startDate) {
-        ticketSql += " AND DATE(t.Date) >= ?";
+        ticketSql += `
+    AND t.Date >= CONVERT_TZ(
+      CONCAT(?, ' 00:00:00'),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         ticketParams.push(filters.startDate);
       }
 
       if (filters.endDate) {
-        ticketSql += " AND DATE(t.Date) <= ?";
+        ticketSql += `
+    AND t.Date < CONVERT_TZ(
+      DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         ticketParams.push(filters.endDate);
       }
 
@@ -382,12 +438,24 @@ async function handleReports(req, res, pathname) {
       const customerParams = [];
 
       if (filters.startDate) {
-        customerSql += " AND DATE(t.Date) >= ?";
+        customerSql += `
+    AND t.Date >= CONVERT_TZ(
+      CONCAT(?, ' 00:00:00'),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         customerParams.push(filters.startDate);
       }
 
       if (filters.endDate) {
-        customerSql += " AND DATE(t.Date) <= ?";
+        customerSql += `
+    AND t.Date < CONVERT_TZ(
+      DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         customerParams.push(filters.endDate);
       }
 
@@ -422,12 +490,24 @@ async function handleReports(req, res, pathname) {
       const enclosureParams = [];
 
       if (filters.startDate) {
-        enclosureSql += " AND DATE(t.Date) >= ?";
+        enclosureSql += `
+    AND t.Date >= CONVERT_TZ(
+      CONCAT(?, ' 00:00:00'),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         enclosureParams.push(filters.startDate);
       }
 
       if (filters.endDate) {
-        enclosureSql += " AND DATE(t.Date) <= ?";
+        enclosureSql += `
+    AND t.Date < CONVERT_TZ(
+      DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         enclosureParams.push(filters.endDate);
       }
 
@@ -505,12 +585,24 @@ async function handleReports(req, res, pathname) {
       const params = [];
 
       if (filters.startDate) {
-        sql += " AND DATE(t.Date) >= ?";
+        sql += `
+    AND t.Date >= CONVERT_TZ(
+      CONCAT(?, ' 00:00:00'),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         params.push(filters.startDate);
       }
 
       if (filters.endDate) {
-        sql += " AND DATE(t.Date) <= ?";
+        sql += `
+    AND t.Date < CONVERT_TZ(
+      DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY),
+      'America/Chicago',
+      '+00:00'
+    )
+  `;
         params.push(filters.endDate);
       }
 

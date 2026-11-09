@@ -146,31 +146,39 @@ function Dashboard() {
       </div>
 
       <div className="kpi-row" style={{ marginTop: 20 }}>
-        <div className="stat-box">
-          <strong>{stats.animals}</strong>
-          <span>Animals on exhibit</span>
-        </div>
-        <div className="stat-box">
-          <strong>{stats.enclosures}</strong>
-          <span>Enclosures</span>
-        </div>
-        <div className="stat-box">
-          <strong>{stats.products}</strong>
-          <span>Products</span>
-        </div>
+        {(isManager || isZookeeper) && (
+          <>
+            <div className="stat-box">
+              <strong>{stats.animals}</strong>
+              <span>Animals on exhibit</span>
+            </div>
+            <div className="stat-box">
+              <strong>{stats.enclosures}</strong>
+              <span>Enclosures</span>
+            </div>
+          </>
+        )}
+
+        {(isManager || isCashier) && (
+          <div className="stat-box">
+            <strong>{stats.products}</strong>
+            <span>Products</span>
+          </div>
+        )}
+
         {(isManager || isZookeeper) && (
           <div className="stat-box">
             <strong>{stats.sick}</strong>
             <span>Sick animals</span>
           </div>
         )}
+
         {(isManager || isCashier) && (
           <div className="stat-box">
             <strong>{stats.lowStock}</strong>
             <span>Low-stock items</span>
           </div>
         )}
-        
       </div>
 
       <div className="report-grid" style={{ marginTop: 8 }}>
@@ -190,6 +198,12 @@ function Dashboard() {
           <Link to="/new-sale" className="report-tile">
             <h3>New sale</h3>
             <p>Record tickets and products for a guest.</p>
+          </Link>
+        )}
+        {(isCashier || isManager) && (
+          <Link to="/products" className="report-tile">
+            <h3>Products</h3>
+            <p>View and manage zoo products.</p>
           </Link>
         )}
         {isManager && (
