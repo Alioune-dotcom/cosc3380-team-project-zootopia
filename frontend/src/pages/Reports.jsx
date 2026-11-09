@@ -406,7 +406,7 @@ export function VisitorActivityReport() {
           customers plan to visit.
         </p>
 
-        <div className="search-form">
+        <div className="search-form visitor-activity-filters">
 
           {/* Date Range */}
           <div style={{ gridColumn: '1 / -1' }}>

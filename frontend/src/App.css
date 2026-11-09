@@ -481,3 +481,31 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Visitor Activity filter layout */
+.visitor-activity-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.visitor-activity-filters > div {
+  grid-column: 1 / -1;
+}
+
+.visitor-activity-filters label {
+  min-width: 0;
+}
+
+.visitor-activity-filters input,
+.visitor-activity-filters select {
+  width: 100%;
+}
+
+/* Smaller screens */
+@media (max-width: 800px) {
+  .visitor-activity-filters {
+    grid-template-columns: 1fr;
+  }
+}
