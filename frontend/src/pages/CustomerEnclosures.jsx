@@ -74,7 +74,8 @@ function CustomerEnclosures() {
       {!error && enclosures.length === 0 ? <p>No enclosures to show.</p> : null}
 
       <div className="report-grid">
-        {enclosures.filter(isPublicEnclosure).map((enc) => {
+        {/* only habitats that are open today (Status Open + no closure today) */}
+        {enclosures.filter((e) => isPublicEnclosure(e) && Number(e.IsOpenToday) === 1).map((enc) => {
           const residents = animalsInEnclosure(enc.Name)
           const resting = restingFrom(enc.EnclosureID)
           const coverSpecies = residents[0]?.Species

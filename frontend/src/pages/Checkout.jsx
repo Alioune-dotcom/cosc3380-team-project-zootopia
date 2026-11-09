@@ -15,16 +15,26 @@ function Checkout() {
   const [enclosures, setEnclosures] = useState([])
   const [selectedEnclosures, setSelectedEnclosures] = useState([])
   const [message, setMessage] = useState('')
+  // tickets are for today only, so a full-zoo closure today means no ticket sales
+  const [zooClosed, setZooClosed] = useState(null) // null = not closed, else the reason
 
   useEffect(() => {
     async function load() {
       try {
-        const encRes = await fetch('/api/enclosures')
+        const [encRes, closedRes] = await Promise.all([
+          fetch('/api/enclosures'),
+          fetch('/api/closures/today'),
+        ])
         const encData = await encRes.json()
+        const closedData = await closedRes.json()
         if (encRes.ok) {
+          // only enclosures open today (shared rule from v_enclosure_open_today)
           setEnclosures(
-            encData.filter((e) => e.Status !== 'Closed' && isPublicEnclosure(e))
+            encData.filter((e) => Number(e.IsOpenToday) === 1 && isPublicEnclosure(e))
           )
+        }
+        if (closedRes.ok && closedData.fullZooClosed) {
+          setZooClosed(closedData.reason || 'Closed')
         }
       } catch (err) {
         // leave empty
@@ -108,6 +118,13 @@ function Checkout() {
   then pay by card.
 </p>
 
+      {zooClosed ? (
+        <div className="page-card">
+          <h3>The zoo is closed today</h3>
+          <p>Reason: {zooClosed}. Tickets can't be bought for today. You can still visit the online shop.</p>
+        </div>
+      ) : (
+      <>
       <div className="wizard-steps">
         {STEPS.map((label, i) => {
           const n = i + 1
@@ -199,6 +216,8 @@ function Checkout() {
             <button type="submit" className="gold">Pay with card</button>
           </div>
         </form>
+      )}
+      </>
       )}
 
       {message ? <p className="message error">{message}</p> : null}

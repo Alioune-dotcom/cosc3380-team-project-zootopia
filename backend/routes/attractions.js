@@ -107,8 +107,9 @@ async function handleAttractions(req, res, pathname) {
       const DurationMinutes = optionalInt(body.DurationMinutes);
       const HostEmployeeID = optionalInt(body.HostEmployeeID);
 
-      if (!Name || !Type || !Schedule || !EnclosureID) {
-        return sendJson(res, 400, { error: "Missing required fields" });
+      // shows and talks need a zookeeper to run them
+      if (!Name || !Type || !Schedule || !EnclosureID || !HostEmployeeID) {
+        return sendJson(res, 400, { error: "Missing required fields (a host is required)" });
       }
 
       const [result] = await pool.query(
@@ -131,6 +132,10 @@ async function handleAttractions(req, res, pathname) {
       const { Name, Type, Schedule, EnclosureID } = body;
       const DurationMinutes = optionalInt(body.DurationMinutes);
       const HostEmployeeID = optionalInt(body.HostEmployeeID);
+
+      if (!Name || !Type || !Schedule || !EnclosureID || !HostEmployeeID) {
+        return sendJson(res, 400, { error: "Missing required fields (a host is required)" });
+      }
 
       const [result] = await pool.query(
         `UPDATE attraction

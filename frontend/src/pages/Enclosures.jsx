@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import DataTable from '../components/DataTable.jsx'
+import { HABITAT_TYPES, LOCATIONS } from '../options.js'
 
 const EMPTY_FORM = {
   Name: '',
@@ -221,11 +222,21 @@ function EnclosureList({ isManager }) {
             <label>Name</label>
             <input name="Name" value={form.Name} onChange={handleChange} />
             <label>Habitat</label>
-            <input name="HabitatType" value={form.HabitatType} onChange={handleChange} />
+            <select name="HabitatType" value={form.HabitatType} onChange={handleChange}>
+              <option value="">-- pick one --</option>
+              {HABITAT_TYPES.map((h) => (
+                <option key={h} value={h}>{h}</option>
+              ))}
+            </select>
             <label>Capacity</label>
             <input name="Capacity" type="number" value={form.Capacity} onChange={handleChange} />
             <label>Location</label>
-            <input name="Location" value={form.Location} onChange={handleChange} />
+            <select name="Location" value={form.Location} onChange={handleChange}>
+              <option value="">-- pick one --</option>
+              {LOCATIONS.map((l) => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
             <label>Status</label>
             <select name="Status" value={form.Status} onChange={handleChange}>
               <option value="Open">Open</option>

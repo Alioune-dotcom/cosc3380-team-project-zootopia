@@ -226,6 +226,31 @@ async function handleCheckout(req, res, pathname) {
     }
   }
 
+  // GET /api/sales/today?employeeId=3 — a cashier's sales so far today (dashboard)
+  if (req.method === "GET" && pathname === "/api/sales/today") {
+    try {
+      const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+      const employeeId = url.searchParams.get("employeeId");
+      if (!employeeId) {
+        return sendJson(res, 400, { error: "Missing employeeId" });
+      }
+
+      const [rows] = await pool.query(
+        `SELECT COUNT(*) AS SaleCount, COALESCE(SUM(TotalAmount), 0) AS SalesTotal
+         FROM v_transaction_totals
+         WHERE EmployeeID = ? AND DATE(\`Date\`) = CURDATE()`,
+        [employeeId]
+      );
+      return sendJson(res, 200, {
+        saleCount: Number(rows[0].SaleCount),
+        salesTotal: Number(rows[0].SalesTotal)
+      });
+    } catch (error) {
+      console.error(error.message);
+      return sendJson(res, 500, { error: "Could not get today's sales" });
+    }
+  }
+
   // POST /api/sales — IN-PERSON sale rung up by a cashier at a gift shop / food stand
   // no customer recorded; products only; Cash or Card
   if (req.method === "POST" && pathname === "/api/sales") {
