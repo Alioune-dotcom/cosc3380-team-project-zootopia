@@ -62,7 +62,7 @@ export function ReportsHub() {
     {
       to: '/reports/animals',
       title: 'Animal Population',
-      blurb: 'Monitor animal counts, health, species, and individual animals.',
+      blurb: 'Monitor animal counts, health, and species.',
     },
     {
       to: '/reports/visitors',

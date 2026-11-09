@@ -150,7 +150,7 @@ function Dashboard() {
           <>
             <div className="stat-box">
               <strong>{stats.animals}</strong>
-              <span>Animals on exhibit</span>
+              <span>Animals</span>
             </div>
             <div className="stat-box">
               <strong>{stats.enclosures}</strong>
@@ -209,7 +209,7 @@ function Dashboard() {
         {isManager && (
           <Link to="/reports" className="report-tile">
             <h3>Reports</h3>
-            <p>Revenue, visits, occupancy, and closures.</p>
+            <p>Revenue, animals, and visits.</p>
           </Link>
         )}
       </div>
