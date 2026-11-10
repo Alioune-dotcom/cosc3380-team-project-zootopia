@@ -32,6 +32,24 @@ async function handleClosures(req, res, pathname) {
 
 
 
+  // GET /api/closures/today — is the whole zoo closed today? (tickets are for today only)
+  if (req.method === "GET" && id === "today") {
+    try {
+      const [rows] = await pool.query(
+        `SELECT Reason FROM zooclosure
+         WHERE \`Date\` = CURDATE() AND Scope = 'FullZoo'
+         LIMIT 1`
+      );
+      return sendJson(res, 200, {
+        fullZooClosed: rows.length > 0,
+        reason: rows.length > 0 ? rows[0].Reason : null
+      });
+    } catch (error) {
+      console.error(error.message);
+      return sendJson(res, 500, { error: "Could not check today's closures" });
+    }
+  }
+
   // GET /api/closures
   if (req.method === "GET" && !id) {
     try {

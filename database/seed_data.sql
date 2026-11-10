@@ -89,15 +89,6 @@ INSERT INTO employee (EmployeeID, FirstName, LastName, HireDate, PhoneNumber, Em
 (4, 'Jamie', 'Lee', '2021-09-01', '713-555-1004', 'jamie@zoo.com', 42000.00, 1, 3),
 (5, 'Casey', 'Nguyen', '2023-01-15', '713-555-1005', 'casey@zoo.com', 36000.00, 1, NULL);
 
--- free scheduled events included with admission; host = zookeeper (optional)
-INSERT INTO attraction (AttractionID, Name, Type, Schedule, DurationMinutes, EnclosureID, HostEmployeeID) VALUES
-(1, 'Lion Talk', 'Talk', '2026-11-05 13:00:00', 30, 1, 2),
-(2, 'Penguin Feeding', 'Show', '2026-11-05 11:00:00', 20, 3, 4),
-(3, 'Elephant Bath', 'Show', '2026-11-06 15:00:00', 45, 2, NULL),
-(4, 'Giraffe Feeding', 'Talk', '2026-11-06 10:30:00', 30, 4, NULL),
-(5, 'Penguin Parade', 'Show', '2026-11-07 14:00:00', 15, 3, 4),
-(6, 'Big Cat Keeper Chat', 'Talk', '2026-11-08 11:30:00', 25, 1, 2);
-
 INSERT INTO employee_shop (EmployeeID, ShopID) VALUES
 (3, 1),
 (3, 2),
@@ -114,6 +105,15 @@ INSERT INTO users (UserID, Username, Password, Role, EmployeeID, CustomerID) VAL
 (7, 'jordan', 'pass123', 'Customer', NULL, 2),
 (8, 'sam', 'pass123', 'Customer', NULL, 3),
 (9, 'riley', 'pass123', 'Customer', NULL, 4);
+
+-- free scheduled events included with admission; host = zookeeper (required)
+INSERT INTO attraction (AttractionID, Name, Type, Schedule, DurationMinutes, EnclosureID, HostEmployeeID) VALUES
+(1, 'Lion Talk', 'Talk', '2026-11-20 13:00:00', 30, 1, 2),
+(2, 'Penguin Feeding', 'Show', '2026-11-20 11:00:00', 20, 3, 4),
+(3, 'Elephant Bath', 'Show', '2026-11-21 15:00:00', 45, 2, 2),
+(4, 'Giraffe Feeding', 'Talk', '2026-11-21 10:30:00', 30, 4, 4),
+(5, 'Penguin Parade', 'Show', '2026-11-22 14:00:00', 15, 3, 4),
+(6, 'Big Cat Keeper Chat', 'Talk', '2026-11-28 11:30:00', 25, 1, 2);
 
 -- Online sales (1-7): customer set, no cashier, online store (ShopID 4), card only
 -- In-person sales (8-13): cashier set, no customer, physical shop

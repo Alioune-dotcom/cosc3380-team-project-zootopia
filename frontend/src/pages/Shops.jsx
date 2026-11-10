@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import DataTable from '../components/DataTable.jsx'
+import { LOCATIONS } from '../options.js'
 
 // manager page: add / edit / remove gift shops and food stands
 // removing a shop is a soft delete (IsDeleted = 1) so past sales stay in reports
@@ -47,7 +48,7 @@ function Shops() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.Name || !form.Location || !form.ShopType) {
+    if (!form.Name || !form.ShopType || (!form.Location && !editingOnline)) {
       setMessage({ type: 'error', text: 'Please fill in every field' })
       return
     }
@@ -119,7 +120,16 @@ function Shops() {
         <input name="Name" value={form.Name} onChange={handleChange} />
 
         <label>Location</label>
-        <input name="Location" value={form.Location} onChange={handleChange} placeholder="e.g. Main Plaza, Zone A" />
+        {editingOnline ? (
+          <p>Online (the online store's location can't be changed)</p>
+        ) : (
+          <select name="Location" value={form.Location} onChange={handleChange}>
+            <option value="">-- pick one --</option>
+            {LOCATIONS.map((l) => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+        )}
 
         <label>Type</label>
         {editingOnline ? (

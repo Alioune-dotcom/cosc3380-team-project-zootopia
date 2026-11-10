@@ -12,6 +12,7 @@ DROP VIEW IF EXISTS v_closures_summary;
 DROP VIEW IF EXISTS v_most_visited_enclosures;
 DROP VIEW IF EXISTS v_revenue_summary;
 DROP VIEW IF EXISTS v_sick_animals;
+DROP VIEW IF EXISTS v_enclosure_open_today;
 
 -- Total for each sale: tickets (qty * price) + products
 -- Channel: Online if a customer is set, otherwise In person (cashier sale)
@@ -137,3 +138,23 @@ JOIN species s ON s.SpeciesID = a.SpeciesID
 JOIN enclosure e ON e.EnclosureID = a.EnclosureID
 WHERE a.IsDeleted = 0
   AND a.IsSick = 1;
+
+-- The one shared "is it open today" rule.
+-- An enclosure is open today if its Status is Open AND there is no closure today
+-- for the whole zoo or for that enclosure. Customer pages + checkout use this.
+CREATE VIEW v_enclosure_open_today AS
+SELECT
+  e.EnclosureID,
+  e.Name,
+  CASE
+    WHEN e.Status = 'Open'
+     AND NOT EXISTS (
+       SELECT 1
+       FROM zooclosure z
+       WHERE z.Date = CURDATE()
+         AND (z.Scope = 'FullZoo' OR z.EnclosureID = e.EnclosureID)
+     )
+    THEN 1 ELSE 0
+  END AS IsOpenToday
+FROM enclosure e
+WHERE e.IsDeleted = 0;

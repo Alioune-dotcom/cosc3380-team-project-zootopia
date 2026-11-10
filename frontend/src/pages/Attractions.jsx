@@ -62,7 +62,8 @@ function Attractions() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.Name || !form.Type || !form.Schedule || !form.EnclosureID) {
+    // shows and talks need a zookeeper to run them
+    if (!form.Name || !form.Type || !form.Schedule || !form.EnclosureID || !form.HostEmployeeID) {
       setMessage({ type: 'error', text: 'Please fill in every field' })
       return
     }
@@ -142,12 +143,14 @@ function Attractions() {
         <select name="EnclosureID" value={form.EnclosureID} onChange={handleChange}>
           <option value="">-- pick one --</option>
           {enclosures.map((en) => (
-            <option key={en.EnclosureID} value={en.EnclosureID}>{en.Name}</option>
+            <option key={en.EnclosureID} value={en.EnclosureID}>
+              {en.Name}{en.Status === 'Closed' ? ' (closed)' : ''}
+            </option>
           ))}
         </select>
-        <label>Host (optional)</label>
+        <label>Host (zookeeper)</label>
         <select name="HostEmployeeID" value={form.HostEmployeeID} onChange={handleChange}>
-          <option value="">-- no host --</option>
+          <option value="">-- pick one --</option>
           {zookeepers.map((z) => (
             <option key={z.EmployeeID} value={z.EmployeeID}>{z.FirstName} {z.LastName}</option>
           ))}
