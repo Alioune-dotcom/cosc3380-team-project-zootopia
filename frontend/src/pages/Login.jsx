@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { loginCustomer } from '../customerAuth.js'
 
+// one login for staff and customers. the role the backend sends back decides where you go
 function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -29,12 +31,18 @@ function Login() {
         return
       }
 
+      setError('')
+
+      // customers -> customer side
       if (data.role === 'Customer') {
-        setError('Use Customer Login for guest accounts')
+        localStorage.removeItem('user')
+        loginCustomer(data)
+        navigate('/checkout')
         return
       }
 
-      setError('')
+      // everyone else is staff -> dashboard
+      localStorage.removeItem('customer')
       localStorage.setItem('user', JSON.stringify({
         username: data.username,
         role: data.role,
@@ -49,7 +57,7 @@ function Login() {
   return (
     <div className="login-page">
       <form className="login-box" onSubmit={handleSubmit}>
-        <h2>Staff Login</h2>
+        <h2>Log In</h2>
 
         <label>Username</label>
         <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" />
@@ -66,6 +74,7 @@ function Login() {
 
         <button type="submit">Log in</button>
 
+        <p>Don't have an account? <Link to="/signup">Sign up</Link></p>
         <p><Link to="/">← Back to Zootopia Zoo</Link></p>
       </form>
     </div>

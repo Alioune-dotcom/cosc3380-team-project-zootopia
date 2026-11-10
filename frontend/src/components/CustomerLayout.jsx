@@ -7,7 +7,7 @@ function CustomerLayout() {
   const customer = getLoggedInCustomer()
 
   if (!customer) {
-    return <Navigate to="/customer-login" replace />
+    return <Navigate to="/login" replace />
   }
 
   function handleLogout() {
