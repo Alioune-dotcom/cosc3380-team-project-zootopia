@@ -219,16 +219,6 @@
   color: var(--muted);
 }
 
-.staff-link {
-  font-size: 12px;
-  color: #8a958e;
-  text-decoration: none;
-}
-
-.staff-link:hover {
-  color: var(--forest);
-}
-
 @media (max-width: 700px) {
   .home-header {
     flex-direction: column;

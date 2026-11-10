@@ -43,7 +43,7 @@ function Home() {
           <a href="#hours">Hours</a>
           <a href="#tickets">Tickets</a>
           <a href="#animals">Animals</a>
-          <Link className="home-nav-cta" to="/customer-login">Customer Login</Link>
+          <Link className="home-nav-cta" to="/login">Log in</Link>
           <Link to="/signup">Sign up</Link>
         </nav>
       </header>
@@ -59,7 +59,7 @@ function Home() {
           <h1>Zootopia Zoo</h1>
           <p>Buy tickets, wander enclosures, and meet animals from around the world.</p>
           <div className="home-hero-actions">
-            <Link className="btn gold" to="/customer-login">Buy tickets</Link>
+            <Link className="btn gold" to="/login">Buy tickets</Link>
             <a className="btn secondary" href="#animals">Meet the animals</a>
           </div>
         </div>
@@ -122,7 +122,6 @@ function Home() {
 
       <footer className="home-footer">
         <p>© 2026 Zootopia Zoo</p>
-        <Link className="staff-link" to="/login">Staff login</Link>
       </footer>
     </div>
   )
