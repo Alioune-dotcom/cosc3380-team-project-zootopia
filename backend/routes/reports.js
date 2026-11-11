@@ -151,6 +151,232 @@ async function handleReports(req, res, pathname) {
   }
 
   // GET /api/reports/revenue?startDate=&endDate=&paymentType=&customerId=&shopId=&productId=&ticketType=
+
+  // GET /api/reports/revenue/details
+  // Returns individual transactions with their ticket and product details.
+  if (
+    req.method === "GET" &&
+    pathname === "/api/reports/revenue/details"
+  ) {
+    try {
+      const customerId = url.searchParams.get("customerId");
+      const shopId = url.searchParams.get("shopId");
+      const productName = url.searchParams.get("productName");
+      const ticketType = url.searchParams.get("ticketType");
+
+      // Get matching transactions.
+      let sql = `
+        SELECT
+          t.TransactionID,
+          t.Date AS SaleDate,
+          t.CustomerID,
+          c.Email AS CustomerEmail,
+          CONCAT(e.FirstName, ' ', e.LastName) AS EmployeeName,
+          s.Name AS ShopName,
+          t.PaymentType
+        FROM \`transaction\` t
+        LEFT JOIN customer c
+          ON c.CustomerID = t.CustomerID
+        LEFT JOIN shop s
+          ON s.ShopID = t.ShopID
+        LEFT JOIN employee e
+          ON e.EmployeeID = t.EmployeeID
+        WHERE 1=1
+      `;
+
+      const params = [];
+
+      if (filters.startDate) {
+        sql += " AND DATE(t.Date) >= ?";
+        params.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        sql += " AND DATE(t.Date) <= ?";
+        params.push(filters.endDate);
+      }
+
+      if (filters.paymentType) {
+        sql += " AND t.PaymentType = ?";
+        params.push(filters.paymentType);
+      }
+
+      if (customerId) {
+        sql += " AND t.CustomerID = ?";
+        params.push(customerId);
+      }
+
+      if (shopId) {
+        sql += " AND t.ShopID = ?";
+        params.push(shopId);
+      }
+
+      // Match the existing revenue report's OR behavior.
+      const matchingConditions = [];
+      const matchingParams = [];
+
+      if (productName) {
+        matchingConditions.push(`
+          EXISTS (
+            SELECT 1
+            FROM transactionproduct tp
+            JOIN product p ON p.ProductID = tp.ProductID
+            WHERE tp.TransactionID = t.TransactionID
+              AND p.Name = ?
+              AND p.IsDeleted = 0
+          )
+        `);
+        matchingParams.push(productName);
+      }
+
+      if (ticketType) {
+        matchingConditions.push(`
+          EXISTS (
+            SELECT 1
+            FROM ticket tk
+            WHERE tk.TransactionID = t.TransactionID
+              AND tk.Type = ?
+          )
+        `);
+        matchingParams.push(ticketType);
+      }
+
+      if (matchingConditions.length > 0) {
+        sql += ` AND (${matchingConditions.join(" OR ")})`;
+        params.push(...matchingParams);
+      }
+
+      sql += " ORDER BY t.Date DESC, t.TransactionID DESC";
+
+      const [transactions] = await pool.query(sql, params);
+
+      if (transactions.length === 0) {
+        return sendJson(res, 200, []);
+      }
+
+      const transactionIds = transactions.map(
+        (transaction) => transaction.TransactionID
+      );
+
+      const placeholders = transactionIds.map(() => "?").join(",");
+
+      // Get ticket details separately.
+      // If filtering by product only, do not include ticket revenue.
+      let tickets = [];
+
+      if (!productName || ticketType) {
+        let ticketSql = `
+          SELECT
+            TransactionID,
+            Type AS TicketType,
+            Quantity,
+            UnitPrice
+          FROM ticket
+          WHERE TransactionID IN (${placeholders})
+        `;
+
+        const ticketParams = [...transactionIds];
+
+        if (ticketType) {
+          ticketSql += " AND Type = ?";
+          ticketParams.push(ticketType);
+        }
+
+        const [ticketRows] = await pool.query(
+          ticketSql,
+          ticketParams
+        );
+
+        tickets = ticketRows;
+      }
+
+      // Get product details separately.
+      // If filtering by ticket only, do not include product revenue.
+      let products = [];
+
+      if (!ticketType || productName) {
+        let productSql = `
+          SELECT
+            tp.TransactionID,
+            tp.ProductID,
+            p.Name AS ProductName,
+            tp.Quantity,
+            tp.UnitPrice
+          FROM transactionproduct tp
+          LEFT JOIN product p
+            ON p.ProductID = tp.ProductID
+          WHERE tp.TransactionID IN (${placeholders})
+        `;
+
+        const productParams = [...transactionIds];
+
+        if (productName) {
+          productSql += `
+            AND p.Name = ?
+            AND p.IsDeleted = 0
+          `;
+          productParams.push(productName);
+        }
+
+        const [productRows] = await pool.query(
+          productSql,
+          productParams
+        );
+
+        products = productRows;
+      }
+
+      // Attach item details and calculate each transaction total.
+      const details = transactions.map((transaction) => {
+        const transactionTickets = tickets.filter(
+          (item) =>
+            item.TransactionID === transaction.TransactionID
+        );
+
+        const transactionProducts = products.filter(
+          (item) =>
+            item.TransactionID === transaction.TransactionID
+        );
+
+        const ticketTotal = transactionTickets.reduce(
+          (sum, item) =>
+            sum + Number(item.Quantity) * Number(item.UnitPrice),
+          0
+        );
+
+        const productTotal = transactionProducts.reduce(
+          (sum, item) =>
+            sum + Number(item.Quantity) * Number(item.UnitPrice),
+          0
+        );
+
+        const ticketDetails = transactionTickets.map(
+          (item) =>
+            `${item.TicketType} x${item.Quantity} ($${Number(item.UnitPrice).toFixed(2)} each)`
+        );
+
+        const productDetails = transactionProducts.map(
+          (item) =>
+            `${item.ProductName || `Product #${item.ProductID}`} x${item.Quantity} ($${Number(item.UnitPrice).toFixed(2)} each)`
+        );
+
+        return {
+          ...transaction,
+          TicketDetails: ticketDetails.join("; ") || "—",
+          ProductDetails: productDetails.join("; ") || "—",
+          TotalAmount: ticketTotal + productTotal
+        };
+      });
+
+      return sendJson(res, 200, details);
+    } catch (error) {
+      console.error(error.message);
+      return sendJson(res, 500, {
+        error: "Could not get detailed revenue report"
+      });
+    }
+  }
+
   if (req.method === "GET" && pathname === "/api/reports/revenue") {
     try {
       const customerId = url.searchParams.get("customerId");

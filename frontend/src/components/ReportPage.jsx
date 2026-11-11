@@ -15,15 +15,23 @@ function ReportPage({
   children,
   insightAsCard = false,
   filtersInside = false,
+  onClearFilters,
+  detailsUrl,
+  detailColumns,
+  detailRowKey,
 }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasGenerated, setHasGenerated] = useState(false)
+  const [detailRows, setDetailRows] = useState([])
+  const [detailsError, setDetailsError] = useState('')
 
   async function generateReport() {
     setLoading(true)
     setError('')
+    setDetailsError('')
+    setDetailRows([])
     setHasGenerated(true)
 
     try {
@@ -44,6 +52,28 @@ function ReportPage({
         setRows([])
       } else {
         setRows(data)
+
+        // Load detailed records when this report supports them.
+        if (detailsUrl) {
+          try {
+            const detailsResponse = await fetch(
+              query ? `${detailsUrl}?${query}` : detailsUrl
+            )
+            const detailsData = await detailsResponse.json()
+
+            if (!detailsResponse.ok) {
+              setDetailsError(
+                detailsData.error || 'Could not load detailed records'
+              )
+            } else {
+              setDetailRows(
+                Array.isArray(detailsData) ? detailsData : []
+              )
+            }
+          } catch (detailError) {
+            setDetailsError('Could not connect to the details endpoint')
+          }
+        }
       }
     } catch (err) {
       setError('Could not connect to the server')
@@ -63,6 +93,59 @@ function ReportPage({
     [rows, bar]
   )
 
+  const visibleDetailColumns = useMemo(() => {
+    return (detailColumns || []).filter((col) => {
+      const isCash = filters?.paymentType === 'Cash'
+      const hasTicketFilter = Boolean(filters?.ticketType)
+      const hasProductFilter = Boolean(
+        filters?.productId || filters?.productName
+      )
+      const isOnlineStore = String(filters?.shopId) === '4'
+
+      // Cash: hide customer and ticket information.
+      if (
+        isCash &&
+        ['CustomerEmail', 'TicketDetails'].includes(col.key)
+      ) {
+        return false
+      }
+
+      // Ticket filter: hide employee and product information.
+      if (
+        hasTicketFilter &&
+        ['EmployeeName', 'ProductDetails'].includes(col.key)
+      ) {
+        return false
+      }
+
+      // Product filter: hide ticket information.
+      if (hasProductFilter && col.key === 'TicketDetails') {
+        return false
+      }
+
+      // Online Store: hide employee information.
+      if (isOnlineStore && col.key === 'EmployeeName') {
+        return false
+      }
+
+      // Customer selected: hide employee information.
+      if (filters?.customerId && col.key === 'EmployeeName') {
+        return false
+      }
+
+      // A non-online shop selected: hide customer and ticket information.
+      if (
+        filters?.shopId &&
+        !isOnlineStore &&
+        ['CustomerEmail', 'TicketDetails'].includes(col.key)
+      ) {
+        return false
+      }
+
+      return true
+    })
+  }, [detailColumns, filters])
+
   const insight = bars?.insight || kpis.find((k) => k.insight)?.insight
 
   return (
@@ -74,19 +157,31 @@ function ReportPage({
         <p style={{ color: 'var(--muted)' }}>{description}</p>
 
         {filtersInside ? children : null}
-        
+
         <p style={{ color: 'var(--muted)', fontSize: 14 }}>
           Set any filters (optional), then generate.
         </p>
 
-        <button
-          type="button"
-          className="gold"
-          onClick={generateReport}
-          disabled={loading}
-        >
-          {loading ? 'Generating…' : hasGenerated ? 'Regenerate report' : 'Generate report'}
-        </button>
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <button
+            type="button"
+            className="gold"
+            onClick={generateReport}
+            disabled={loading}
+          >
+            {loading ? 'Generating…' : 'Apply Filters'}
+          </button>
+
+          {onClearFilters && (
+            <button
+              type="button"
+              onClick={onClearFilters}
+              disabled={loading}
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
       </div>
 
       {error ? <p className="message error">{error}</p> : null}
@@ -140,15 +235,32 @@ function ReportPage({
               </div>
             </div>
           ) : null}
-
           <div className="page-card">
             <h3 style={{ marginTop: 0 }}>Detail table</h3>
             <DataTable columns={columns} rows={rows} rowKey={rowKey} />
           </div>
+
+          {detailsUrl ? (
+            <div className="page-card">
+              <h3 style={{ marginTop: 0 }}>Detailed transactions</h3>
+
+              {detailsError ? (
+                <p className="message error">{detailsError}</p>
+              ) : (
+                <DataTable
+                  columns={visibleDetailColumns}
+                  rows={detailRows}
+                  rowKey={detailRowKey}
+                />
+              )}
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>
   )
+
+
 }
 
 export default ReportPage

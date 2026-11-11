@@ -160,9 +160,6 @@ export function AnimalPopulationReport() {
 
   function clearFilters() {
     setFilters(emptyFilters)
-    if (hasGenerated) {
-      generateReport(emptyFilters)
-    }
   }
 
   const summary = data?.summary
@@ -389,10 +386,6 @@ export function VisitorActivityReport() {
 
   function clearFilters() {
     setFilters(emptyFilters)
-
-    if (hasGenerated) {
-      generateReport(emptyFilters)
-    }
   }
 
   const summary = data?.summary
@@ -646,6 +639,7 @@ export function OccupancyReport() {
       description="Evaluate habitat utilization, available spaces, and enclosures approaching their capacity."
       url="/api/reports/enclosure-occupancy"
       filters={filters}
+
       rowKey="EnclosureID"
       columns={[
         { key: 'EnclosureName', label: 'Enclosure' },
@@ -870,6 +864,20 @@ export function RevenueReport() {
   const productNames = [
     ...new Set(products.map((product) => product.Name)),
   ].sort((a, b) => a.localeCompare(b))
+  
+  const emptyFilters = {
+    startDate: '',
+    endDate: '',
+    paymentType: '',
+    customerId: '',
+    shopId: '',
+    productName: '',
+    ticketType: '',
+  }
+
+  function clearFilters() {
+    setFilters({ ...emptyFilters })
+  }
 
   return (
     <ReportPage
@@ -878,7 +886,21 @@ export function RevenueReport() {
       insightAsCard
       filtersInside
       filters={filters}
+      onClearFilters={clearFilters}
       url="/api/reports/revenue"
+      detailsUrl="/api/reports/revenue/details"
+      detailRowKey="TransactionID"
+      detailColumns={[
+        { key: 'TransactionID', label: 'Transaction ID' },
+        { key: 'SaleDate', label: 'Date', isDate: true },
+        { key: 'CustomerEmail', label: 'Customer' },
+        { key: 'EmployeeName', label: 'Employee' },
+        { key: 'ShopName', label: 'Shop' },
+        { key: 'PaymentType', label: 'Payment' },
+        { key: 'TicketDetails', label: 'Tickets' },
+        { key: 'ProductDetails', label: 'Products' },
+        { key: 'TotalAmount', label: 'Total', isMoney: true },
+      ]}
       rowKey={(row) => row.SaleDate + '-' + row.PaymentType}
       columns={[
         { key: 'SaleDate', label: 'Date', isDate: true },
@@ -1017,56 +1039,6 @@ export function RevenueReport() {
 }
 
 
-export function ClosuresReport() {
-  const [filters, setFilters] = useState({ startDate: '', endDate: '', scope: '' })
-
-  return (
-    <div>
-      <FilterBar filters={filters} setFilters={setFilters}>
-        <label>
-          Scope
-          <select
-            value={filters.scope}
-            onChange={(e) => setFilters({ ...filters, scope: e.target.value })}
-          >
-            <option value="">All</option>
-            <option value="FullZoo">Full zoo</option>
-            <option value="Enclosure">Enclosure</option>
-          </select>
-        </label>
-      </FilterBar>
-      <ReportPage
-        title="Closures"
-        description="Track weather and maintenance downtime that hurts attendance."
-        url={buildUrl('/api/reports/closures', filters)}
-        rowKey="ClosureID"
-        columns={[
-          { key: 'Date', label: 'Date', isDate: true },
-          { key: 'Reason', label: 'Reason' },
-          { key: 'Scope', label: 'Scope' },
-          { key: 'EnclosureName', label: 'Enclosure' },
-        ]}
-        summarize={(rows) => {
-          const full = rows.filter((r) => r.Scope === 'FullZoo').length
-          const enc = rows.filter((r) => r.Scope === 'Enclosure').length
-          return [
-            { label: 'Closures', value: rows.length },
-            { label: 'Full zoo', value: full },
-            { label: 'Enclosure only', value: enc },
-            {
-              insight: full
-                ? `${full} full-zoo closure(s) in range — biggest attendance risk.`
-                : enc
-                  ? `${enc} habitat closure(s); rest of park stayed open.`
-                  : 'No closures in this filter.',
-            },
-          ]
-        }}
-      />
-    </div>
-  )
-}
-
 export function MostVisitedReport() {
   const [filters, setFilters] = useState({ startDate: '', endDate: '' })
 
@@ -1104,24 +1076,6 @@ export function MostVisitedReport() {
           ),
         })}
       />
-    </div>
-  )
-}
-
-
-export function ZooCapacityReport() {
-  return (
-    <div>
-      <div className="page-card">
-        <h2 style={{ marginTop: 0 }}>Zoo Capacity Report</h2>
-        <p style={{ color: 'var(--muted)' }}>
-          Analyze how effectively the zoo uses its available animal habitats.
-          Review enclosure capacity, animal counts, and available spaces to
-          identify enclosures approaching their limits.
-        </p>
-      </div>
-
-      <OccupancyReport />
     </div>
   )
 }
