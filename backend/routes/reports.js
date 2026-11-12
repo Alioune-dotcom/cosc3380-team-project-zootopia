@@ -151,6 +151,232 @@ async function handleReports(req, res, pathname) {
   }
 
   // GET /api/reports/revenue?startDate=&endDate=&paymentType=&customerId=&shopId=&productId=&ticketType=
+
+  // GET /api/reports/revenue/details
+  // Returns individual transactions with their ticket and product details.
+  if (
+    req.method === "GET" &&
+    pathname === "/api/reports/revenue/details"
+  ) {
+    try {
+      const customerId = url.searchParams.get("customerId");
+      const shopId = url.searchParams.get("shopId");
+      const productName = url.searchParams.get("productName");
+      const ticketType = url.searchParams.get("ticketType");
+
+      // Get matching transactions.
+      let sql = `
+        SELECT
+          t.TransactionID,
+          t.Date AS SaleDate,
+          t.CustomerID,
+          c.Email AS CustomerEmail,
+          CONCAT(e.FirstName, ' ', e.LastName) AS EmployeeName,
+          s.Name AS ShopName,
+          t.PaymentType
+        FROM \`transaction\` t
+        LEFT JOIN customer c
+          ON c.CustomerID = t.CustomerID
+        LEFT JOIN shop s
+          ON s.ShopID = t.ShopID
+        LEFT JOIN employee e
+          ON e.EmployeeID = t.EmployeeID
+        WHERE 1=1
+      `;
+
+      const params = [];
+
+      if (filters.startDate) {
+        sql += " AND DATE(t.Date) >= ?";
+        params.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        sql += " AND DATE(t.Date) <= ?";
+        params.push(filters.endDate);
+      }
+
+      if (filters.paymentType) {
+        sql += " AND t.PaymentType = ?";
+        params.push(filters.paymentType);
+      }
+
+      if (customerId) {
+        sql += " AND t.CustomerID = ?";
+        params.push(customerId);
+      }
+
+      if (shopId) {
+        sql += " AND t.ShopID = ?";
+        params.push(shopId);
+      }
+
+      // Match the existing revenue report's OR behavior.
+      const matchingConditions = [];
+      const matchingParams = [];
+
+      if (productName) {
+        matchingConditions.push(`
+          EXISTS (
+            SELECT 1
+            FROM transactionproduct tp
+            JOIN product p ON p.ProductID = tp.ProductID
+            WHERE tp.TransactionID = t.TransactionID
+              AND p.Name = ?
+              AND p.IsDeleted = 0
+          )
+        `);
+        matchingParams.push(productName);
+      }
+
+      if (ticketType) {
+        matchingConditions.push(`
+          EXISTS (
+            SELECT 1
+            FROM ticket tk
+            WHERE tk.TransactionID = t.TransactionID
+              AND tk.Type = ?
+          )
+        `);
+        matchingParams.push(ticketType);
+      }
+
+      if (matchingConditions.length > 0) {
+        sql += ` AND (${matchingConditions.join(" OR ")})`;
+        params.push(...matchingParams);
+      }
+
+      sql += " ORDER BY t.Date DESC, t.TransactionID DESC";
+
+      const [transactions] = await pool.query(sql, params);
+
+      if (transactions.length === 0) {
+        return sendJson(res, 200, []);
+      }
+
+      const transactionIds = transactions.map(
+        (transaction) => transaction.TransactionID
+      );
+
+      const placeholders = transactionIds.map(() => "?").join(",");
+
+      // Get ticket details separately.
+      // If filtering by product only, do not include ticket revenue.
+      let tickets = [];
+
+      if (!productName || ticketType) {
+        let ticketSql = `
+          SELECT
+            TransactionID,
+            Type AS TicketType,
+            Quantity,
+            UnitPrice
+          FROM ticket
+          WHERE TransactionID IN (${placeholders})
+        `;
+
+        const ticketParams = [...transactionIds];
+
+        if (ticketType) {
+          ticketSql += " AND Type = ?";
+          ticketParams.push(ticketType);
+        }
+
+        const [ticketRows] = await pool.query(
+          ticketSql,
+          ticketParams
+        );
+
+        tickets = ticketRows;
+      }
+
+      // Get product details separately.
+      // If filtering by ticket only, do not include product revenue.
+      let products = [];
+
+      if (!ticketType || productName) {
+        let productSql = `
+          SELECT
+            tp.TransactionID,
+            tp.ProductID,
+            p.Name AS ProductName,
+            tp.Quantity,
+            tp.UnitPrice
+          FROM transactionproduct tp
+          LEFT JOIN product p
+            ON p.ProductID = tp.ProductID
+          WHERE tp.TransactionID IN (${placeholders})
+        `;
+
+        const productParams = [...transactionIds];
+
+        if (productName) {
+          productSql += `
+            AND p.Name = ?
+            AND p.IsDeleted = 0
+          `;
+          productParams.push(productName);
+        }
+
+        const [productRows] = await pool.query(
+          productSql,
+          productParams
+        );
+
+        products = productRows;
+      }
+
+      // Attach item details and calculate each transaction total.
+      const details = transactions.map((transaction) => {
+        const transactionTickets = tickets.filter(
+          (item) =>
+            item.TransactionID === transaction.TransactionID
+        );
+
+        const transactionProducts = products.filter(
+          (item) =>
+            item.TransactionID === transaction.TransactionID
+        );
+
+        const ticketTotal = transactionTickets.reduce(
+          (sum, item) =>
+            sum + Number(item.Quantity) * Number(item.UnitPrice),
+          0
+        );
+
+        const productTotal = transactionProducts.reduce(
+          (sum, item) =>
+            sum + Number(item.Quantity) * Number(item.UnitPrice),
+          0
+        );
+
+        const ticketDetails = transactionTickets.map(
+          (item) =>
+            `${item.TicketType} x${item.Quantity} ($${Number(item.UnitPrice).toFixed(2)} each)`
+        );
+
+        const productDetails = transactionProducts.map(
+          (item) =>
+            `${item.ProductName || `Product #${item.ProductID}`} x${item.Quantity} ($${Number(item.UnitPrice).toFixed(2)} each)`
+        );
+
+        return {
+          ...transaction,
+          TicketDetails: ticketDetails.join("; ") || "—",
+          ProductDetails: productDetails.join("; ") || "—",
+          TotalAmount: ticketTotal + productTotal
+        };
+      });
+
+      return sendJson(res, 200, details);
+    } catch (error) {
+      console.error(error.message);
+      return sendJson(res, 500, {
+        error: "Could not get detailed revenue report"
+      });
+    }
+  }
+
   if (req.method === "GET" && pathname === "/api/reports/revenue") {
     try {
       const customerId = url.searchParams.get("customerId");
@@ -283,44 +509,7 @@ async function handleReports(req, res, pathname) {
     }
   }
 
-  // GET /api/reports/closures?startDate=&endDate=&scope=
-  if (req.method === "GET" && pathname === "/api/reports/closures") {
-    try {
-      let sql = `
-        SELECT
-          z.ClosureID,
-          z.Date,
-          z.Reason,
-          z.Scope,
-          z.EnclosureID,
-          e.Name AS EnclosureName
-        FROM zooclosure z
-        LEFT JOIN enclosure e ON e.EnclosureID = z.EnclosureID
-        WHERE 1=1
-      `;
-      const params = [];
 
-      if (filters.startDate) {
-        sql += " AND z.Date >= ?";
-        params.push(filters.startDate);
-      }
-      if (filters.endDate) {
-        sql += " AND z.Date <= ?";
-        params.push(filters.endDate);
-      }
-      if (filters.scope) {
-        sql += " AND z.Scope = ?";
-        params.push(filters.scope);
-      }
-
-      sql += " ORDER BY z.Date DESC";
-      const [rows] = await pool.query(sql, params);
-      return sendJson(res, 200, rows);
-    } catch (error) {
-      console.error(error.message);
-      return sendJson(res, 500, { error: "Could not get closures report" });
-    }
-  }
 
 
   // GET /api/reports/visitor-activity
@@ -331,7 +520,7 @@ async function handleReports(req, res, pathname) {
       const enclosureId = url.searchParams.get("enclosureId");
       const habitatType = url.searchParams.get("habitatType");
 
-      // 1. Ticket popularity
+      // Ticket popularity
       let ticketSql = `
         SELECT
           tk.Type AS TicketType,
@@ -368,7 +557,53 @@ async function handleReports(req, res, pathname) {
 
       const [ticketRows] = await pool.query(ticketSql, ticketParams);
 
-      // 2. Unique customers who purchased tickets
+      // Individual ticket purchase details
+      let ticketDetailsSql = `
+      SELECT
+        tk.TicketID,
+        t.TransactionID,
+        t.Date AS PurchaseDate,
+        c.Email AS CustomerEmail,
+        tk.Type AS TicketType,
+        tk.Quantity,
+        tk.UnitPrice,
+        (tk.Quantity * tk.UnitPrice) AS TotalPrice
+      FROM ticket tk
+      JOIN \`transaction\` t
+        ON t.TransactionID = tk.TransactionID
+      JOIN customer c
+        ON c.CustomerID = t.CustomerID
+      WHERE t.CustomerID IS NOT NULL
+      AND c.IsDeleted = 0
+    `;
+
+      const ticketDetailsParams = [];
+
+      if (filters.startDate) {
+        ticketDetailsSql += " AND DATE(t.Date) >= ?";
+        ticketDetailsParams.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        ticketDetailsSql += " AND DATE(t.Date) <= ?";
+        ticketDetailsParams.push(filters.endDate);
+      }
+
+      if (ticketType) {
+        ticketDetailsSql += " AND tk.Type = ?";
+        ticketDetailsParams.push(ticketType);
+      }
+
+      ticketDetailsSql += `
+      ORDER BY t.Date DESC, t.TransactionID DESC
+      `;
+
+      const [ticketDetailRows] = await pool.query(
+        ticketDetailsSql,
+        ticketDetailsParams
+      );
+
+      // Unique customers who purchased tickets
       let customerSql = `
         SELECT COUNT(DISTINCT t.CustomerID) AS UniqueCustomers
         FROM \`transaction\` t
@@ -398,7 +633,7 @@ async function handleReports(req, res, pathname) {
 
       const [customerRows] = await pool.query(customerSql, customerParams);
 
-      // 3. Planned enclosure visits
+      // Planned enclosure visits
       let enclosureSql = `
         SELECT
           e.EnclosureID,
@@ -455,7 +690,61 @@ async function handleReports(req, res, pathname) {
         enclosureParams
       );
 
-      // 4. Combine the results into one report
+      // Individual planned enclosure visit details
+      let visitDetailsSql = `
+  SELECT
+    CONCAT(te.TransactionID, '-', te.EnclosureID) AS VisitDetailID,
+    t.TransactionID,
+    t.Date AS VisitDate,
+    c.Email AS CustomerEmail,
+    e.Name AS EnclosureName,
+    e.Location,
+    e.HabitatType
+  FROM transaction_enclosure te
+  JOIN \`transaction\` t
+    ON t.TransactionID = te.TransactionID
+  JOIN customer c
+    ON c.CustomerID = t.CustomerID
+  JOIN enclosure e
+    ON e.EnclosureID = te.EnclosureID
+  WHERE t.CustomerID IS NOT NULL
+    AND c.IsDeleted = 0
+    AND e.IsDeleted = 0
+    AND e.EnclosureID <> 6
+`;
+
+      const visitDetailsParams = [];
+
+      if (filters.startDate) {
+        visitDetailsSql += " AND DATE(t.Date) >= ?";
+        visitDetailsParams.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        visitDetailsSql += " AND DATE(t.Date) <= ?";
+        visitDetailsParams.push(filters.endDate);
+      }
+
+      if (enclosureId) {
+        visitDetailsSql += " AND e.EnclosureID = ?";
+        visitDetailsParams.push(enclosureId);
+      }
+
+      if (habitatType) {
+        visitDetailsSql += " AND e.HabitatType = ?";
+        visitDetailsParams.push(habitatType);
+      }
+
+      visitDetailsSql += `
+      ORDER BY t.Date DESC, t.TransactionID DESC, e.Name
+      `;
+
+      const [visitDetailRows] = await pool.query(
+        visitDetailsSql,
+        visitDetailsParams
+      );
+
+      // Combine the results into one report
       const totalTicketsSold = ticketRows.reduce(
         (total, row) => total + Number(row.TicketsSold),
         0
@@ -475,7 +764,9 @@ async function handleReports(req, res, pathname) {
           MostPopularEnclosure: enclosureRows[0]?.EnclosureName || null
         },
         ticketPopularity: ticketRows,
-        plannedVisits: enclosureRows
+        plannedVisits: enclosureRows,
+        ticketDetails: ticketDetailRows,
+        plannedVisitDetails: visitDetailRows
       });
 
     } catch (error) {
@@ -675,6 +966,31 @@ async function handleReports(req, res, pathname) {
         [...filterParams]
       );
 
+      // Individual animal details
+      const [detailRows] = await pool.query(
+        `
+        SELECT
+        a.AnimalID,
+        a.Name,
+        s.CommonName,
+        e.Name AS EnclosureName,
+        a.Sex,
+        CASE
+          WHEN a.IsSick = 1 THEN 'Sick'
+          ELSE 'Healthy'
+        END AS HealthStatus
+      FROM animal a
+      JOIN species s ON s.SpeciesID = a.SpeciesID
+      JOIN enclosure e ON e.EnclosureID = a.EnclosureID
+      WHERE a.IsDeleted = 0
+        AND s.IsDeleted = 0
+        AND e.IsDeleted = 0
+        ${filterSql}
+      ORDER BY s.CommonName, a.Name
+      `,
+        [...filterParams]
+      );
+
 
       // Average enclosure occupancy (independent of animal filters).
       const [occupancyRows] = await pool.query(
@@ -724,7 +1040,8 @@ async function handleReports(req, res, pathname) {
         bySpecies: speciesRows,
         byEnclosure: enclosureRows,
         bySex: sexRows,
-        occupancy: occupancyRows[0]
+        occupancy: occupancyRows[0],
+        details: detailRows
       });
 
     } catch (error) {
