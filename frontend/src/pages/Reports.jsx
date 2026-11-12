@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import ReportPage from '../components/ReportPage.jsx'
+import DataTable from '../components/DataTable.jsx'
 
 function FilterBar({ filters, setFilters, children }) {
   return (
@@ -165,6 +166,15 @@ export function AnimalPopulationReport() {
   const summary = data?.summary
   const sexCounts = data?.bySex || []
 
+  const animalDetailColumns = [
+    { key: 'AnimalID', label: 'Animal ID' },
+    { key: 'Name', label: 'Animal Name' },
+    { key: 'CommonName', label: 'Species' },
+    { key: 'EnclosureName', label: 'Enclosure' },
+    { key: 'Sex', label: 'Sex' },
+    { key: 'HealthStatus', label: 'Health Status' },
+  ]
+
   const maleCount =
     sexCounts.find((row) => row.Sex === 'Male')?.AnimalCount ?? 0
 
@@ -318,6 +328,20 @@ export function AnimalPopulationReport() {
               </tbody>
             </table>
           </div>
+
+          <div className="page-card">
+            <h3 style={{ marginTop: 0 }}>Detailed animal records</h3>
+
+            {data.details?.length > 0 ? (
+              <DataTable
+                columns={animalDetailColumns}
+                rows={data.details}
+                rowKey="AnimalID"
+              />
+            ) : (
+              <p>No animals found for these filters.</p>
+            )}
+          </div>
         </>
       ) : null}
     </div>
@@ -341,6 +365,7 @@ export function VisitorActivityReport() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [hasGenerated, setHasGenerated] = useState(false)
+  const [reportView, setReportView] = useState('both')
 
   useEffect(() => {
     fetch('/api/enclosures')
@@ -391,6 +416,10 @@ export function VisitorActivityReport() {
   const summary = data?.summary
   const ticketRows = data?.ticketPopularity || []
   const visitRows = data?.plannedVisits || []
+  const ticketDetailRows = data?.ticketDetails || []
+  const visitDetailRows = data?.plannedVisitDetails || []
+  const showTickets = reportView === 'both' || reportView === 'tickets'
+  const showVisits = reportView === 'both' || reportView === 'visits'
 
   return (
     <div>
@@ -401,103 +430,122 @@ export function VisitorActivityReport() {
           customers plan to visit.
         </p>
 
-        <div className="search-form">
 
-          {/* Date Range */}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <h3 style={{ marginBottom: 4 }}>Date Range</h3>
-            <p style={{ color: 'var(--muted)', marginTop: 0 }}>
-              Applies to both ticket purchases and planned enclosure visits.
-            </p>
+        <div className="visitor-filter-form">
+
+          {/* Report View */}
+          <div className="visitor-filter-group visitor-view-group">
+            <h3>Report View</h3>
+            <p>Choose which visitor activity information to display.</p>
+
+            <label>
+              Select report
+              <select
+                value={reportView}
+                onChange={(e) => setReportView(e.target.value)}
+              >
+                <option value="both">Both reports</option>
+                <option value="tickets">Ticket purchases</option>
+                <option value="visits">Planned visits</option>
+              </select>
+            </label>
           </div>
 
-          <label>
-            Start date
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) =>
-                setFilters({ ...filters, startDate: e.target.value })
-              }
-            />
-          </label>
+          {/* Shared Date Filters */}
+          <div className="visitor-filter-group">
+            <h3>Date Range</h3>
+            <p>Applies to the selected report or reports.</p>
 
-          <label>
-            End date
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) =>
-                setFilters({ ...filters, endDate: e.target.value })
-              }
-            />
-          </label>
+            <label>
+              Start date
+              <input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) =>
+                  setFilters({ ...filters, startDate: e.target.value })
+                }
+              />
+            </label>
 
-          {/* Ticket Purchase Filters */}
-          <div style={{ gridColumn: '1 / -1', marginTop: 12 }}>
-            <h3 style={{ marginBottom: 4 }}>Ticket Purchase Filters</h3>
-            <p style={{ color: 'var(--muted)', marginTop: 0 }}>
-              Filter ticket popularity and unique customer counts.
-            </p>
+            <label>
+              End date
+              <input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) =>
+                  setFilters({ ...filters, endDate: e.target.value })
+                }
+              />
+            </label>
           </div>
 
-          <label>
-            Ticket type
-            <select
-              value={filters.ticketType}
-              onChange={(e) =>
-                setFilters({ ...filters, ticketType: e.target.value })
-              }
-            >
-              <option value="">All ticket types</option>
-              <option value="Adult">Adult</option>
-              <option value="Child">Child</option>
-              <option value="Senior">Senior</option>
-            </select>
-          </label>
+          {/* Ticket Filters */}
+          {showTickets && (
+            <div className="visitor-filter-group">
+              <h3>Ticket Purchase Filters</h3>
+              <p>Filter ticket sales and customer purchases.</p>
+
+              <label>
+                Ticket type
+                <select
+                  value={filters.ticketType}
+                  onChange={(e) =>
+                    setFilters({ ...filters, ticketType: e.target.value })
+                  }
+                >
+                  <option value="">All ticket types</option>
+                  <option value="Adult">Adult</option>
+                  <option value="Child">Child</option>
+                  <option value="Senior">Senior</option>
+                </select>
+              </label>
+            </div>
+          )}
 
           {/* Planned Visit Filters */}
-          <div style={{ gridColumn: '1 / -1', marginTop: 12 }}>
-            <h3 style={{ marginBottom: 4 }}>Planned Visit Filters</h3>
-            <p style={{ color: 'var(--muted)', marginTop: 0 }}>
-              Filter customer interest in specific enclosures and habitats.
-            </p>
-          </div>
+          {showVisits && (
+            <div className="visitor-filter-group">
+              <h3>Planned Visit Filters</h3>
+              <p>Filter customer interest in enclosures and habitats.</p>
 
-          <label>
-            Enclosure
-            <select
-              value={filters.enclosureId}
-              onChange={(e) =>
-                setFilters({ ...filters, enclosureId: e.target.value })
-              }
-            >
-              <option value="">All enclosures</option>
-              {enclosures.map((item) => (
-                <option key={item.EnclosureID} value={item.EnclosureID}>
-                  {item.Name}
-                </option>
-              ))}
-            </select>
-          </label>
+              <label>
+                Enclosure
+                <select
+                  value={filters.enclosureId}
+                  onChange={(e) =>
+                    setFilters({ ...filters, enclosureId: e.target.value })
+                  }
+                >
+                  <option value="">All enclosures</option>
+                  {enclosures.map((item) => (
+                    <option key={item.EnclosureID} value={item.EnclosureID}>
+                      {item.Name}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-          <label>
-            Habitat type
-            <select
-              value={filters.habitatType}
-              onChange={(e) =>
-                setFilters({ ...filters, habitatType: e.target.value })
-              }
-            >
-              <option value="">All habitat types</option>
-              {habitatTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </label>
+              <label>
+                Habitat type
+                <select
+                  value={filters.habitatType}
+                  onChange={(e) =>
+                    setFilters({ ...filters, habitatType: e.target.value })
+                  }
+                >
+                  <option value="">All habitat types</option>
+                  {habitatTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+
         </div>
+
 
         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
           <button
@@ -532,90 +580,184 @@ export function VisitorActivityReport() {
       {data && !loading && !error ? (
         <>
           <div className="kpi-row">
-            <div className="stat-box">
-              <strong>{Number(summary?.TotalTicketsSold || 0)}</strong>
-              <span>Tickets sold</span>
-            </div>
+            {showTickets && (
+              <>
+                <div className="stat-box">
+                  <strong>{Number(summary?.TotalTicketsSold || 0)}</strong>
+                  <span>Tickets sold</span>
+                </div>
 
-            <div className="stat-box">
-              <strong>{summary?.MostPopularTicketType || '—'}</strong>
-              <span>Most popular ticket</span>
-            </div>
+                <div className="stat-box">
+                  <strong>{summary?.MostPopularTicketType || '—'}</strong>
+                  <span>Most popular ticket</span>
+                </div>
 
-            <div className="stat-box">
-              <strong>{Number(summary?.UniqueCustomers || 0)}</strong>
-              <span>Unique customers</span>
-            </div>
+                <div className="stat-box">
+                  <strong>{Number(summary?.UniqueCustomers || 0)}</strong>
+                  <span>Unique customers</span>
+                </div>
+              </>
+            )}
 
-            <div className="stat-box">
-              <strong>{Number(summary?.TotalPlannedVisits || 0)}</strong>
-              <span>Planned enclosure visits</span>
-            </div>
+            {showVisits && (
+              <>
+                <div className="stat-box">
+                  <strong>{Number(summary?.TotalPlannedVisits || 0)}</strong>
+                  <span>Planned enclosure visits</span>
+                </div>
 
-            <div className="stat-box">
-              <strong>{summary?.MostPopularEnclosure || '—'}</strong>
-              <span>Most popular enclosure</span>
-            </div>
-          </div>
-
-          <div className="page-card">
-            <h3 style={{ marginTop: 0 }}>Ticket popularity</h3>
-
-            {ticketRows.length > 0 ? (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Ticket type</th>
-                    <th>Tickets sold</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ticketRows.map((row) => (
-                    <tr key={row.TicketType}>
-                      <td>{row.TicketType}</td>
-                      <td>{Number(row.TicketsSold)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p>No ticket sales found for these filters.</p>
+                <div className="stat-box">
+                  <strong>{summary?.MostPopularEnclosure || '—'}</strong>
+                  <span>Most popular enclosure</span>
+                </div>
+              </>
             )}
           </div>
 
-          <div className="page-card">
-            <h3 style={{ marginTop: 0 }}>Planned enclosure visits</h3>
-            <p style={{ color: 'var(--muted)' }}>
-              Shows the enclosures customers selected during checkout.
-            </p>
+          {showTickets && (
+            <>
+              <div className="page-card">
+                <h3 style={{ marginTop: 0 }}>Ticket popularity</h3>
 
-            {visitRows.length > 0 ? (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Enclosure</th>
-                    <th>Location</th>
-                    <th>Habitat type</th>
-                    <th>Planned visits</th>
-                    <th>Unique customers</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visitRows.map((row) => (
-                    <tr key={row.EnclosureID}>
-                      <td>{row.EnclosureName}</td>
-                      <td>{row.Location || '—'}</td>
-                      <td>{row.HabitatType || '—'}</td>
-                      <td>{Number(row.VisitCount)}</td>
-                      <td>{Number(row.UniqueCustomers)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p>No planned enclosure visits found for these filters.</p>
-            )}
-          </div>
+                {ticketRows.length > 0 ? (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Ticket type</th>
+                        <th>Tickets sold</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ticketRows.map((row) => (
+                        <tr key={row.TicketType}>
+                          <td>{row.TicketType}</td>
+                          <td>{Number(row.TicketsSold)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p>No ticket sales found for these filters.</p>
+                )}
+              </div>
+
+              <div className="page-card">
+                <h3 style={{ marginTop: 0 }}>Ticket purchase details</h3>
+                <p style={{ color: 'var(--muted)' }}>
+                  Individual ticket purchases made by customers.
+                </p>
+
+                {ticketDetailRows.length > 0 ? (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Transaction ID</th>
+                        <th>Purchase Date</th>
+                        <th>Customer Email</th>
+                        <th>Ticket Type</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Total Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ticketDetailRows.map((row) => (
+                        <tr key={row.TicketID}>
+                          <td>{row.TransactionID}</td>
+                          <td>{new Date(row.PurchaseDate).toLocaleDateString()}</td>
+                          <td>{row.CustomerEmail}</td>
+                          <td>{row.TicketType}</td>
+                          <td>{Number(row.Quantity)}</td>
+                          <td>${Number(row.UnitPrice).toFixed(2)}</td>
+                          <td>${Number(row.TotalPrice).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p>No ticket purchase details found for these filters.</p>
+                )}
+              </div>
+
+            </>
+          )}
+
+          {showVisits && (
+            <>
+              <div className="page-card">
+                <h3 style={{ marginTop: 0 }}>Planned enclosure visits</h3>
+                <p style={{ color: 'var(--muted)' }}>
+                  Shows the enclosures customers selected during checkout.
+                </p>
+
+                {visitRows.length > 0 ? (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Enclosure</th>
+                        <th>Location</th>
+                        <th>Habitat type</th>
+                        <th>Planned visits</th>
+                        <th>Unique customers</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visitRows.map((row) => (
+                        <tr key={row.EnclosureID}>
+                          <td>{row.EnclosureName}</td>
+                          <td>{row.Location || '—'}</td>
+                          <td>{row.HabitatType || '—'}</td>
+                          <td>{Number(row.VisitCount)}</td>
+                          <td>{Number(row.UniqueCustomers)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p>No planned enclosure visits found for these filters.</p>
+                )}
+              </div>
+
+
+              <div className="page-card">
+                <h3 style={{ marginTop: 0 }}>Planned visit details</h3>
+                <p style={{ color: 'var(--muted)' }}>
+                  Individual enclosure selections made during customer checkout.
+                </p>
+
+                {visitDetailRows.length > 0 ? (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Transaction ID</th>
+                        <th>Date</th>
+                        <th>Customer Email</th>
+                        <th>Enclosure</th>
+                        <th>Location</th>
+                        <th>Habitat Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visitDetailRows.map((row) => (
+                        <tr key={row.VisitDetailID}>
+                          <td>{row.TransactionID}</td>
+                          <td>{new Date(row.VisitDate).toLocaleDateString()}</td>
+                          <td>{row.CustomerEmail}</td>
+                          <td>{row.EnclosureName}</td>
+                          <td>{row.Location || '—'}</td>
+                          <td>{row.HabitatType || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p>No planned visit details found for these filters.</p>
+                )}
+              </div>
+
+            </>
+          )}
+
         </>
       ) : null}
     </div>
@@ -864,7 +1006,7 @@ export function RevenueReport() {
   const productNames = [
     ...new Set(products.map((product) => product.Name)),
   ].sort((a, b) => a.localeCompare(b))
-  
+
   const emptyFilters = {
     startDate: '',
     endDate: '',

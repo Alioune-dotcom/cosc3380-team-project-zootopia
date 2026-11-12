@@ -509,44 +509,7 @@ async function handleReports(req, res, pathname) {
     }
   }
 
-  // GET /api/reports/closures?startDate=&endDate=&scope=
-  if (req.method === "GET" && pathname === "/api/reports/closures") {
-    try {
-      let sql = `
-        SELECT
-          z.ClosureID,
-          z.Date,
-          z.Reason,
-          z.Scope,
-          z.EnclosureID,
-          e.Name AS EnclosureName
-        FROM zooclosure z
-        LEFT JOIN enclosure e ON e.EnclosureID = z.EnclosureID
-        WHERE 1=1
-      `;
-      const params = [];
 
-      if (filters.startDate) {
-        sql += " AND z.Date >= ?";
-        params.push(filters.startDate);
-      }
-      if (filters.endDate) {
-        sql += " AND z.Date <= ?";
-        params.push(filters.endDate);
-      }
-      if (filters.scope) {
-        sql += " AND z.Scope = ?";
-        params.push(filters.scope);
-      }
-
-      sql += " ORDER BY z.Date DESC";
-      const [rows] = await pool.query(sql, params);
-      return sendJson(res, 200, rows);
-    } catch (error) {
-      console.error(error.message);
-      return sendJson(res, 500, { error: "Could not get closures report" });
-    }
-  }
 
 
   // GET /api/reports/visitor-activity
@@ -557,7 +520,7 @@ async function handleReports(req, res, pathname) {
       const enclosureId = url.searchParams.get("enclosureId");
       const habitatType = url.searchParams.get("habitatType");
 
-      // 1. Ticket popularity
+      // Ticket popularity
       let ticketSql = `
         SELECT
           tk.Type AS TicketType,
@@ -594,7 +557,53 @@ async function handleReports(req, res, pathname) {
 
       const [ticketRows] = await pool.query(ticketSql, ticketParams);
 
-      // 2. Unique customers who purchased tickets
+      // Individual ticket purchase details
+      let ticketDetailsSql = `
+      SELECT
+        tk.TicketID,
+        t.TransactionID,
+        t.Date AS PurchaseDate,
+        c.Email AS CustomerEmail,
+        tk.Type AS TicketType,
+        tk.Quantity,
+        tk.UnitPrice,
+        (tk.Quantity * tk.UnitPrice) AS TotalPrice
+      FROM ticket tk
+      JOIN \`transaction\` t
+        ON t.TransactionID = tk.TransactionID
+      JOIN customer c
+        ON c.CustomerID = t.CustomerID
+      WHERE t.CustomerID IS NOT NULL
+      AND c.IsDeleted = 0
+    `;
+
+      const ticketDetailsParams = [];
+
+      if (filters.startDate) {
+        ticketDetailsSql += " AND DATE(t.Date) >= ?";
+        ticketDetailsParams.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        ticketDetailsSql += " AND DATE(t.Date) <= ?";
+        ticketDetailsParams.push(filters.endDate);
+      }
+
+      if (ticketType) {
+        ticketDetailsSql += " AND tk.Type = ?";
+        ticketDetailsParams.push(ticketType);
+      }
+
+      ticketDetailsSql += `
+      ORDER BY t.Date DESC, t.TransactionID DESC
+      `;
+
+      const [ticketDetailRows] = await pool.query(
+        ticketDetailsSql,
+        ticketDetailsParams
+      );
+
+      // Unique customers who purchased tickets
       let customerSql = `
         SELECT COUNT(DISTINCT t.CustomerID) AS UniqueCustomers
         FROM \`transaction\` t
@@ -624,7 +633,7 @@ async function handleReports(req, res, pathname) {
 
       const [customerRows] = await pool.query(customerSql, customerParams);
 
-      // 3. Planned enclosure visits
+      // Planned enclosure visits
       let enclosureSql = `
         SELECT
           e.EnclosureID,
@@ -681,7 +690,61 @@ async function handleReports(req, res, pathname) {
         enclosureParams
       );
 
-      // 4. Combine the results into one report
+      // Individual planned enclosure visit details
+      let visitDetailsSql = `
+  SELECT
+    CONCAT(te.TransactionID, '-', te.EnclosureID) AS VisitDetailID,
+    t.TransactionID,
+    t.Date AS VisitDate,
+    c.Email AS CustomerEmail,
+    e.Name AS EnclosureName,
+    e.Location,
+    e.HabitatType
+  FROM transaction_enclosure te
+  JOIN \`transaction\` t
+    ON t.TransactionID = te.TransactionID
+  JOIN customer c
+    ON c.CustomerID = t.CustomerID
+  JOIN enclosure e
+    ON e.EnclosureID = te.EnclosureID
+  WHERE t.CustomerID IS NOT NULL
+    AND c.IsDeleted = 0
+    AND e.IsDeleted = 0
+    AND e.EnclosureID <> 6
+`;
+
+      const visitDetailsParams = [];
+
+      if (filters.startDate) {
+        visitDetailsSql += " AND DATE(t.Date) >= ?";
+        visitDetailsParams.push(filters.startDate);
+      }
+
+      if (filters.endDate) {
+        visitDetailsSql += " AND DATE(t.Date) <= ?";
+        visitDetailsParams.push(filters.endDate);
+      }
+
+      if (enclosureId) {
+        visitDetailsSql += " AND e.EnclosureID = ?";
+        visitDetailsParams.push(enclosureId);
+      }
+
+      if (habitatType) {
+        visitDetailsSql += " AND e.HabitatType = ?";
+        visitDetailsParams.push(habitatType);
+      }
+
+      visitDetailsSql += `
+      ORDER BY t.Date DESC, t.TransactionID DESC, e.Name
+      `;
+
+      const [visitDetailRows] = await pool.query(
+        visitDetailsSql,
+        visitDetailsParams
+      );
+
+      // Combine the results into one report
       const totalTicketsSold = ticketRows.reduce(
         (total, row) => total + Number(row.TicketsSold),
         0
@@ -701,7 +764,9 @@ async function handleReports(req, res, pathname) {
           MostPopularEnclosure: enclosureRows[0]?.EnclosureName || null
         },
         ticketPopularity: ticketRows,
-        plannedVisits: enclosureRows
+        plannedVisits: enclosureRows,
+        ticketDetails: ticketDetailRows,
+        plannedVisitDetails: visitDetailRows
       });
 
     } catch (error) {
@@ -901,6 +966,31 @@ async function handleReports(req, res, pathname) {
         [...filterParams]
       );
 
+      // Individual animal details
+      const [detailRows] = await pool.query(
+        `
+        SELECT
+        a.AnimalID,
+        a.Name,
+        s.CommonName,
+        e.Name AS EnclosureName,
+        a.Sex,
+        CASE
+          WHEN a.IsSick = 1 THEN 'Sick'
+          ELSE 'Healthy'
+        END AS HealthStatus
+      FROM animal a
+      JOIN species s ON s.SpeciesID = a.SpeciesID
+      JOIN enclosure e ON e.EnclosureID = a.EnclosureID
+      WHERE a.IsDeleted = 0
+        AND s.IsDeleted = 0
+        AND e.IsDeleted = 0
+        ${filterSql}
+      ORDER BY s.CommonName, a.Name
+      `,
+        [...filterParams]
+      );
+
 
       // Average enclosure occupancy (independent of animal filters).
       const [occupancyRows] = await pool.query(
@@ -950,7 +1040,8 @@ async function handleReports(req, res, pathname) {
         bySpecies: speciesRows,
         byEnclosure: enclosureRows,
         bySex: sexRows,
-        occupancy: occupancyRows[0]
+        occupancy: occupancyRows[0],
+        details: detailRows
       });
 
     } catch (error) {
