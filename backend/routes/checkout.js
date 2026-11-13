@@ -249,8 +249,11 @@ async function handleCheckout(req, res, pathname) {
 
       const [rows] = await pool.query(
         `SELECT COUNT(*) AS SaleCount, COALESCE(SUM(TotalAmount), 0) AS SalesTotal
-         FROM v_transaction_totals
-         WHERE EmployeeID = ? AND DATE(\`Date\`) = CURDATE()`,
+        FROM v_transaction_totals
+        WHERE EmployeeID = ?
+        AND DATE(\`Date\`) = DATE(
+          CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', 'America/Chicago')
+        )`,
         [employeeId]
       );
       return sendJson(res, 200, {
@@ -290,16 +293,7 @@ async function handleCheckout(req, res, pathname) {
 
       if (receiptEmail) {
         if (receiptEmail.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail)) {
-          return sendJson(res, 400, { error: "Customer email is not valid" });
-        }
-
-        // the email must belong to an existing (not deleted) customer
-        const [customerRows] = await pool.query(
-          "SELECT CustomerID FROM customer WHERE Email = ? AND IsDeleted = 0",
-          [receiptEmail]
-        );
-        if (customerRows.length === 0) {
-          return sendJson(res, 400, { error: "Customer email does not exist" });
+          return sendJson(res, 400, { error: "Receipt email is not valid" });
         }
       }
 

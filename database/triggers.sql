@@ -203,7 +203,9 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM `zooclosure`
-    WHERE `Date` = CURDATE() AND `Scope` = 'FullZoo'
+    WHERE `Date` = DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', 'America/Chicago')
+    )
+    AND Scope = 'FullZoo'
   ) THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'The zoo is closed today.';
