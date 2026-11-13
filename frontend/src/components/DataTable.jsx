@@ -7,13 +7,26 @@ function DataTable({ columns, rows, rowKey, actions }) {
     return <p>No records found.</p>
   }
 
-  // what to show in one cell
-  function showValue(value, col) {
-    if (value == null) return '—'
-    if (col.isDate) return String(value).slice(0, 10) // 2012-11-11T06:00... -> 2012-11-11
-    if (col.isMoney) return '$' + Number(value).toFixed(2) // "37.98" -> $37.98
-    return String(value)
+// what to show in one cell
+function showValue(value, col, row) {
+  if (col.format) return col.format(value, row)
+
+  if (value == null) return '—'
+
+  if (col.isDateTime) {
+    return new Date(value).toLocaleDateString('en-US', {
+      timeZone: 'America/Chicago',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
   }
+
+  if (col.isDate) return String(value).slice(0, 10)
+  if (col.isMoney) return '$' + Number(value).toFixed(2)
+
+  return String(value)
+}
 
   return (
     <table className="data-table">
@@ -29,7 +42,7 @@ function DataTable({ columns, rows, rowKey, actions }) {
         {rows.map((row, index) => (
           <tr key={typeof rowKey === 'function' ? rowKey(row) : row[rowKey] ?? index}>
             {columns.map((col) => (
-              <td key={col.key}>{showValue(row[col.key], col)}</td>
+              <td key={col.key}>{showValue(row[col.key], col, row)}</td>
             ))}
             {actions ? <td>{actions(row)}</td> : null}
           </tr>

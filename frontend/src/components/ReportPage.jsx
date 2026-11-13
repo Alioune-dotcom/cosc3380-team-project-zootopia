@@ -123,10 +123,6 @@ function ReportPage({
         return false
       }
 
-      // Online Store: hide employee information.
-      if (isOnlineStore && col.key === 'EmployeeName') {
-        return false
-      }
 
       // Customer selected: hide employee information.
       if (filters?.customerId && col.key === 'EmployeeName') {

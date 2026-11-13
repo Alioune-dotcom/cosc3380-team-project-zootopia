@@ -1034,9 +1034,16 @@ export function RevenueReport() {
       detailRowKey="TransactionID"
       detailColumns={[
         { key: 'TransactionID', label: 'Transaction ID' },
-        { key: 'SaleDate', label: 'Date', isDate: true },
+        { key: 'SaleDate', label: 'Date', isDateTime: true },
         { key: 'CustomerEmail', label: 'Customer' },
-        { key: 'EmployeeName', label: 'Employee' },
+        {
+          key: 'EmployeeName',
+          label: 'Employee',
+          format: (value, row) =>
+            String(row.ShopName || '').toLowerCase().includes('online')
+              ? 'Online Order'
+              : value || '—',
+        },
         { key: 'ShopName', label: 'Shop' },
         { key: 'PaymentType', label: 'Payment' },
         { key: 'TicketDetails', label: 'Tickets' },
@@ -1045,7 +1052,7 @@ export function RevenueReport() {
       ]}
       rowKey={(row) => row.SaleDate + '-' + row.PaymentType}
       columns={[
-        { key: 'SaleDate', label: 'Date', isDate: true },
+        { key: 'SaleDate', label: 'Date', isDateTime: true },
         { key: 'PaymentType', label: 'Payment' },
         { key: 'SaleCount', label: 'Sales' },
         { key: 'Revenue', label: 'Revenue', isMoney: true },
@@ -1075,13 +1082,23 @@ export function RevenueReport() {
       bar={(rows) => {
         const byDate = {}
         rows.forEach((r) => {
-          const key = String(r.SaleDate).slice(0, 10)
+          const key = new Date(r.SaleDate).toLocaleDateString('en-CA', {
+            timeZone: 'America/Chicago',
+          })
+
           byDate[key] = (byDate[key] || 0) + Number(r.Revenue)
         })
 
         const items = Object.entries(byDate)
-          .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([label, value]) => ({ label, value }))
+          .sort((a, b) => b[0].localeCompare(a[0]))
+          .map(([date, value]) => {
+            const [year, month, day] = date.split('-')
+
+            return {
+              label: `${month}/${day}/${year}`,
+              value,
+            }
+          })
 
         const max = Math.max(...items.map((i) => i.value), 1)
 
