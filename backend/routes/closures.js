@@ -37,8 +37,11 @@ async function handleClosures(req, res, pathname) {
     try {
       const [rows] = await pool.query(
         `SELECT Reason FROM zooclosure
-         WHERE \`Date\` = CURDATE() AND Scope = 'FullZoo'
-         LIMIT 1`
+        WHERE \`Date\` = DATE(
+        CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', 'America/Chicago')
+        )
+        AND Scope = 'FullZoo'
+        LIMIT 1`
       );
       return sendJson(res, 200, {
         fullZooClosed: rows.length > 0,
@@ -82,47 +85,61 @@ async function handleClosures(req, res, pathname) {
 
 
 
- // POST /api/closures
-if (req.method === "POST" && !id) {
-  try {
-    const body = await readBody(req);
-    const { Date, Reason, Scope, EnclosureID } = body;
+  // POST /api/closures
+  if (req.method === "POST" && !id) {
+    try {
+      const body = await readBody(req);
+      const { Date, Reason, Scope, EnclosureID } = body;
 
-    if (!Date || !Reason || !Scope) {
-      return sendJson(res, 400, { error: "Missing required fields" });
-    }
-    if (Scope === "FullZoo" && EnclosureID != null) {
-      return sendJson(res, 400, { error: "FullZoo closure cannot have EnclosureID" });
-    }
-    if (Scope === "Enclosure" && EnclosureID == null) {
-      return sendJson(res, 400, { error: "Enclosure closure needs EnclosureID" });
-    }
+      if (!Date || !Reason || !Scope) {
+        return sendJson(res, 400, { error: "Missing required fields" });
+      }
+      if (Scope === "FullZoo" && EnclosureID != null) {
+        return sendJson(res, 400, { error: "FullZoo closure cannot have EnclosureID" });
+      }
+      if (Scope === "Enclosure" && EnclosureID == null) {
+        return sendJson(res, 400, { error: "Enclosure closure needs EnclosureID" });
+      }
 
-    // save the closure history row
-    const [result] = await pool.query(
-      `INSERT INTO zooclosure (\`Date\`, Reason, Scope, EnclosureID)
+      // save the closure history row
+      const [result] = await pool.query(
+        `INSERT INTO zooclosure (\`Date\`, Reason, Scope, EnclosureID)
        VALUES (?, ?, ?, ?)`,
-      [Date, Reason, Scope, EnclosureID ?? null]
-    );
+        [Date, Reason, Scope, EnclosureID ?? null]
+      );
 
-    // also update live enclosure Status
-    if (Scope === "FullZoo") {
-      await pool.query(
-        "UPDATE enclosure SET Status = 'Closed' WHERE IsDeleted = 0"
-      );
-    } else if (Scope === "Enclosure") {
-      await pool.query(
-        "UPDATE enclosure SET Status = 'Closed' WHERE EnclosureID = ? AND IsDeleted = 0",
-        [EnclosureID]
-      );
+      // also update live enclosure Status, but only for a closure dated TODAY.
+      // future closures must not close anything early; v_enclosure_open_today and the
+      // attraction triggers already check zooclosure by date when that day comes.
+      if (Scope === "FullZoo") {
+        await pool.query(
+          `UPDATE enclosure
+        SET Status = 'Closed'
+        WHERE IsDeleted = 0
+        AND DATE(?) = DATE(
+          CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', 'America/Chicago')
+        )`,
+          [Date]
+        );
+      } else if (Scope === "Enclosure") {
+        await pool.query(
+          `UPDATE enclosure
+        SET Status = 'Closed'
+        WHERE EnclosureID = ?
+        AND IsDeleted = 0
+        AND DATE(?) = DATE(
+          CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', 'America/Chicago')
+        )`,
+          [EnclosureID, Date]
+        );
+      }
+
+      return sendJson(res, 201, { ClosureID: result.insertId });
+    } catch (error) {
+      console.error(error.message);
+      return sendJson(res, 400, { error: error.message });
     }
-
-    return sendJson(res, 201, { ClosureID: result.insertId });
-  } catch (error) {
-    console.error(error.message);
-    return sendJson(res, 400, { error: error.message });
   }
-}
 
 
   // PUT /api/closures/:id

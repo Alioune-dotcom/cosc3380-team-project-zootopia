@@ -56,24 +56,30 @@ async function handleReports(req, res, pathname) {
           COALESCE(SUM(tp.Quantity * tp.UnitPrice), 0) AS Revenue
         FROM product p
         JOIN shop s ON s.ShopID = p.ShopID
-        LEFT JOIN transactionproduct tp
-          ON tp.ProductID = p.ProductID
-        LEFT JOIN \`transaction\` t
-          ON t.TransactionID = tp.TransactionID
-        WHERE p.IsDeleted = 0
-          AND s.IsDeleted = 0
+        LEFT JOIN (
+          transactionproduct tp
+          JOIN \`transaction\` t
+            ON t.TransactionID = tp.TransactionID
       `;
       const params = [];
 
+      // date range goes in the join, so products with no sales in the range
+      // still show up with 0 instead of disappearing
       if (filters.startDate) {
-        sql += " AND (t.Date IS NULL OR DATE(t.Date) >= ?)";
+        sql += " AND DATE(t.Date) >= ?";
         params.push(filters.startDate);
       }
 
       if (filters.endDate) {
-        sql += " AND (t.Date IS NULL OR DATE(t.Date) <= ?)";
+        sql += " AND DATE(t.Date) <= ?";
         params.push(filters.endDate);
       }
+
+      sql += `
+        ) ON tp.ProductID = p.ProductID
+        WHERE p.IsDeleted = 0
+          AND s.IsDeleted = 0
+      `;
 
       if (url.searchParams.get("shopId")) {
         sql += " AND p.ShopID = ?";
@@ -170,7 +176,7 @@ async function handleReports(req, res, pathname) {
           t.TransactionID,
           t.Date AS SaleDate,
           t.CustomerID,
-          c.Email AS CustomerEmail,
+          COALESCE(c.Email, t.ReceiptEmail) AS CustomerEmail,
           CONCAT(e.FirstName, ' ', e.LastName) AS EmployeeName,
           s.Name AS ShopName,
           t.PaymentType

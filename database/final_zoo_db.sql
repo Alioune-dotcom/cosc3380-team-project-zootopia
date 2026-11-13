@@ -341,7 +341,8 @@ DROP TABLE IF EXISTS `transaction`;
 /*!50503 SET character_set_client = utf8mb4 */;
 -- Two kinds of sale share this table:
 --   Online:    CustomerID set, EmployeeID NULL, ShopID = the online store, Card only
---   In person: EmployeeID (cashier) set, CustomerID NULL, ShopID = gift shop / food stand
+--   In person: EmployeeID (cashier) set, CustomerID NULL, ShopID = gift shop / food stand,
+--              ReceiptEmail optional (email the customer gave at the register)
 CREATE TABLE `transaction` (
   `TransactionID` int NOT NULL AUTO_INCREMENT,
   `CustomerID` int DEFAULT NULL,
@@ -349,6 +350,7 @@ CREATE TABLE `transaction` (
   `ShopID` int NOT NULL,
   `Date` datetime NOT NULL,
   `PaymentType` varchar(50) NOT NULL,
+  `ReceiptEmail` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`TransactionID`),
   KEY `CustomerID` (`CustomerID`),
   KEY `EmployeeID` (`EmployeeID`),
@@ -364,7 +366,10 @@ CREATE TABLE `transaction` (
     (`CustomerID` IS NULL AND `EmployeeID` IS NOT NULL)
   ),
   -- online sales are card only
-  CONSTRAINT `transaction_chk_online_card` CHECK ((`CustomerID` IS NULL OR `PaymentType` = 'Card'))
+  CONSTRAINT `transaction_chk_online_card` CHECK ((`CustomerID` IS NULL OR `PaymentType` = 'Card')),
+  -- optional receipt email, only on in-person sales
+  CONSTRAINT `transaction_chk_receipt_inperson` CHECK ((`ReceiptEmail` IS NULL OR `CustomerID` IS NULL)),
+  CONSTRAINT `transaction_chk_receipt_format`   CHECK ((`ReceiptEmail` IS NULL OR `ReceiptEmail` LIKE '%_@_%._%'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

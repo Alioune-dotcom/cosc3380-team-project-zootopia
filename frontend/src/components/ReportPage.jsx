@@ -102,11 +102,9 @@ function ReportPage({
       )
       const isOnlineStore = String(filters?.shopId) === '4'
 
-      // Cash: hide customer and ticket information.
-      if (
-        isCash &&
-        ['CustomerEmail', 'TicketDetails'].includes(col.key)
-      ) {
+      // Cash: hide ticket information (tickets are online/card only).
+      // Keep Customer: in-person cash sales can carry a receipt email.
+      if (isCash && col.key === 'TicketDetails') {
         return false
       }
 
@@ -123,22 +121,15 @@ function ReportPage({
         return false
       }
 
-      // Online Store: hide employee information.
-      if (isOnlineStore && col.key === 'EmployeeName') {
-        return false
-      }
 
       // Customer selected: hide employee information.
       if (filters?.customerId && col.key === 'EmployeeName') {
         return false
       }
 
-      // A non-online shop selected: hide customer and ticket information.
-      if (
-        filters?.shopId &&
-        !isOnlineStore &&
-        ['CustomerEmail', 'TicketDetails'].includes(col.key)
-      ) {
+      // A non-online shop selected: hide ticket information.
+      // Keep Customer: the cashier may have entered a receipt email.
+      if (filters?.shopId && !isOnlineStore && col.key === 'TicketDetails') {
         return false
       }
 

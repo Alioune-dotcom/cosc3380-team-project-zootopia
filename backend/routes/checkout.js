@@ -102,12 +102,24 @@ async function insertVisitedEnclosures(connection, transactionId, enclosureIds) 
   const unique = [...new Set(enclosureIds.map((id) => parseInt(id, 10)).filter(Boolean))];
 
   for (const enclosureId of unique) {
+    // must exist, be open today (status + closures), and be a public habitat
     const [rows] = await connection.query(
-      "SELECT EnclosureID FROM enclosure WHERE EnclosureID = ? AND IsDeleted = 0",
+      `SELECT e.EnclosureID, e.Name, COALESCE(o.IsOpenToday, 0) AS IsOpenToday
+       FROM enclosure e
+       LEFT JOIN v_enclosure_open_today o ON o.EnclosureID = e.EnclosureID
+       WHERE e.EnclosureID = ?
+         AND e.IsDeleted = 0
+         AND e.HabitatType <> 'Medical'
+         AND e.Name <> 'Quarantine Ward'`,
       [enclosureId]
     );
     if (rows.length === 0) {
       const err = new Error("Enclosure not found: " + enclosureId);
+      err.statusCode = 400;
+      throw err;
+    }
+    if (Number(rows[0].IsOpenToday) !== 1) {
+      const err = new Error(rows[0].Name + " is closed today");
       err.statusCode = 400;
       throw err;
     }
@@ -237,8 +249,11 @@ async function handleCheckout(req, res, pathname) {
 
       const [rows] = await pool.query(
         `SELECT COUNT(*) AS SaleCount, COALESCE(SUM(TotalAmount), 0) AS SalesTotal
-         FROM v_transaction_totals
-         WHERE EmployeeID = ? AND DATE(\`Date\`) = CURDATE()`,
+        FROM v_transaction_totals
+        WHERE EmployeeID = ?
+        AND DATE(\`Date\`) = DATE(
+          CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', 'America/Chicago')
+        )`,
         [employeeId]
       );
       return sendJson(res, 200, {
@@ -252,7 +267,7 @@ async function handleCheckout(req, res, pathname) {
   }
 
   // POST /api/sales — IN-PERSON sale rung up by a cashier at a gift shop / food stand
-  // no customer recorded; products only; Cash or Card
+  // no customer account linked; optional receipt email; products only; Cash or Card
   if (req.method === "POST" && pathname === "/api/sales") {
     let connection;
 
@@ -260,6 +275,9 @@ async function handleCheckout(req, res, pathname) {
       const body = await readBody(req);
       const { employeeId, shopId, paymentType } = body;
       const productList = Array.isArray(body.products) ? body.products : [];
+
+      // optional: email the customer gave at the register (blank = none)
+      const receiptEmail = (body.customerEmail || "").trim().toLowerCase() || null;
 
       if (!employeeId || !shopId || !paymentType) {
         return sendJson(res, 400, { error: "Missing cashier, shop, or payment type" });
@@ -273,14 +291,20 @@ async function handleCheckout(req, res, pathname) {
         return sendJson(res, 400, { error: "Add at least one product" });
       }
 
+      if (receiptEmail) {
+        if (receiptEmail.length > 100 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail)) {
+          return sendJson(res, 400, { error: "Receipt email is not valid" });
+        }
+      }
+
       connection = await pool.getConnection();
       await connection.beginTransaction();
 
       // shop + cashier rules are checked by trg_transaction_shop_rules
       const [txResult] = await connection.query(
-        `INSERT INTO \`transaction\` (CustomerID, EmployeeID, ShopID, \`Date\`, PaymentType)
-         VALUES (NULL, ?, ?, NOW(), ?)`,
-        [employeeId, shopId, paymentType]
+        `INSERT INTO \`transaction\` (CustomerID, EmployeeID, ShopID, \`Date\`, PaymentType, ReceiptEmail)
+         VALUES (NULL, ?, ?, NOW(), ?, ?)`,
+        [employeeId, shopId, paymentType, receiptEmail]
       );
       const transactionId = txResult.insertId;
 
@@ -292,6 +316,7 @@ async function handleCheckout(req, res, pathname) {
       return sendJson(res, 201, {
         transactionId,
         paymentType,
+        receiptEmail,
         message: "Sale recorded"
       });
     } catch (error) {

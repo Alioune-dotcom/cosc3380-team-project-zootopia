@@ -151,7 +151,8 @@ SELECT
      AND NOT EXISTS (
        SELECT 1
        FROM zooclosure z
-       WHERE z.Date = CURDATE()
+       WHERE z.Date = DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', 'America/Chicago')
+        )
          AND (z.Scope = 'FullZoo' OR z.EnclosureID = e.EnclosureID)
      )
     THEN 1 ELSE 0
