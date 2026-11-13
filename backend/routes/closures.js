@@ -105,15 +105,19 @@ if (req.method === "POST" && !id) {
       [Date, Reason, Scope, EnclosureID ?? null]
     );
 
-    // also update live enclosure Status
+    // also update live enclosure Status, but only for a closure dated TODAY.
+    // future closures must not close anything early; v_enclosure_open_today and the
+    // attraction triggers already check zooclosure by date when that day comes.
     if (Scope === "FullZoo") {
       await pool.query(
-        "UPDATE enclosure SET Status = 'Closed' WHERE IsDeleted = 0"
+        "UPDATE enclosure SET Status = 'Closed' WHERE IsDeleted = 0 AND DATE(?) = CURDATE()",
+        [Date]
       );
     } else if (Scope === "Enclosure") {
       await pool.query(
-        "UPDATE enclosure SET Status = 'Closed' WHERE EnclosureID = ? AND IsDeleted = 0",
-        [EnclosureID]
+        `UPDATE enclosure SET Status = 'Closed'
+         WHERE EnclosureID = ? AND IsDeleted = 0 AND DATE(?) = CURDATE()`,
+        [EnclosureID, Date]
       );
     }
 

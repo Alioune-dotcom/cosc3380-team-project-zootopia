@@ -132,7 +132,11 @@ async function handleEnclosures(req, res, pathname) {
 if (req.method === "POST" && id === "reopen-all") {
   try {
     const [result] = await pool.query(
-      "UPDATE enclosure SET Status = 'Open' WHERE IsDeleted = 0"
+      // never open the Quarantine Ward / medical areas to the public
+      `UPDATE enclosure SET Status = 'Open'
+       WHERE IsDeleted = 0
+         AND HabitatType <> 'Medical'
+         AND Name <> 'Quarantine Ward'`
     );
 
     return sendJson(res, 200, {

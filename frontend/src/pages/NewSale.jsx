@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 
 // in-person sale at a gift shop or food stand
-// no customer is recorded; the sale stores the shop, the cashier, and the items
+// no customer account is linked; the sale stores the shop, the cashier, the items,
+// and an optional receipt email the customer gives at the register
 // cashiers only see the shops they're assigned to; managers can pick any shop
 function NewSale() {
   const user = JSON.parse(localStorage.getItem('user'))
@@ -12,6 +13,7 @@ function NewSale() {
   const [products, setProducts] = useState([])
   const [qtyById, setQtyById] = useState({})
   const [paymentType, setPaymentType] = useState('Cash')
+  const [customerEmail, setCustomerEmail] = useState('')
   const [message, setMessage] = useState(null) // { type, text }
 
   // load the shops this employee can sell at (never the online store)
@@ -68,10 +70,17 @@ function NewSale() {
       setMessage({ type: 'error', text: 'Pick a shop' })
       return
     }
-if (selectedProducts.length === 0) {
-  setMessage({ type: 'error', text: 'Add at least one product' })
-  return
-}
+    if (selectedProducts.length === 0) {
+      setMessage({ type: 'error', text: 'Add at least one product' })
+      return
+    }
+
+    // optional receipt email: blank is fine, otherwise it must look like an email
+    const email = customerEmail.trim()
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setMessage({ type: 'error', text: 'Enter a valid email or leave it blank' })
+      return
+    }
 
     try {
       const response = await fetch('/api/sales', {
@@ -81,6 +90,7 @@ if (selectedProducts.length === 0) {
           employeeId: user.employeeId,
           shopId: Number(shopId),
           paymentType,
+          customerEmail: email || undefined,
           products: selectedProducts.map((p) => ({
             productId: p.productId,
             quantity: p.quantity,
@@ -92,8 +102,13 @@ if (selectedProducts.length === 0) {
         setMessage({ type: 'error', text: data.error || 'Sale failed' })
         return
       }
-      setMessage({ type: 'success', text: 'Sale recorded. Transaction #' + data.transactionId })
+      setMessage({
+        type: 'success',
+        text: 'Sale recorded. Transaction #' + data.transactionId +
+          (data.receiptEmail ? ' · receipt email: ' + data.receiptEmail : ''),
+      })
       setQtyById({})
+      setCustomerEmail('')
       loadProducts(shopId)
     } catch (err) {
       setMessage({ type: 'error', text: 'Could not connect to the server' })
@@ -158,6 +173,16 @@ if (selectedProducts.length === 0) {
                 </tbody>
               </table>
             )}
+
+            <h3>Customer email <span style={{ color: 'var(--muted)', fontWeight: 'normal' }}>(optional)</span></h3>
+            <input
+              type="email"
+              placeholder="customer@example.com"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              maxLength={100}
+              autoComplete="off"
+            />
 
             <h3>Payment</h3>
             <div className="payment-cards">
